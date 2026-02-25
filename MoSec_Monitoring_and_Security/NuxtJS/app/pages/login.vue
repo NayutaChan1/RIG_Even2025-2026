@@ -22,11 +22,6 @@
             </div>
 
         </div>
-
-        <div class="to-Register">
-            <p>Don't have an account? <NuxtLink to="/register">Sign Up</NuxtLink></p>
-        </div>
-
     </div>
 </template>
 
