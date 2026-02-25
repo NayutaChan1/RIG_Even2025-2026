@@ -60,14 +60,16 @@
           </div>
         </div>
 
-        <div class="card card-pink" @click="togglePintu">
+        <div class="card card-pink">
+        <!-- <div class="card card-pink" @click="togglePintu"> -->
           <div class="card-header">
             <span class="tag">🔒 Kunci Ruangan</span>
           </div>
           <div class="card-body">
-            <h1 class="big-number">{{ statusPintu }}</h1>
-            <p v-if="statusPintu === 'TERKUNCI'">Aman & Terkunci Rapat</p>
-            <p v-else>BAHAYA: Pintu Terbuka!</p>
+            <p>{{ statusPintuText }}</p>
+            <!-- <h1 class="big-number">{{ statusPintu }}</h1>
+            <p v-if="statusPintu === 'TERKUNCI'">Aman & Terkunci Rapat</p> -->
+            <!-- <p v-else>BAHAYA: Pintu Terbuka!</p> -->
           </div>
         </div>
 
@@ -108,22 +110,42 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
 
 const statusProyektor = ref('NYALA')
-const statusPintu = ref('TERKUNCI')
-
+const { doorId, fetchDoorId, updateDoorId } = useDoorStatus()
+console.log(doorId)
 function toggleProyektor() {
   statusProyektor.value = statusProyektor.value === 'NYALA' ? 'MATI' : 'NYALA'
 }
 
-function togglePintu() {
-  statusPintu.value = statusPintu.value === 'TERKUNCI' ? 'TERBUKA' : 'TERKUNCI'
-}
+// function togglePintu() {
+//   statusPintu.value = statusPintu.value === 'TERKUNCI' ? 'TERBUKA' : 'TERKUNCI'
+// }
+
+
+const statusPintuText = computed(() => {  
+  return doorId.value
+})
 
 function handleLogout() {
   navigateTo('/login')
 }
+
+let intervalId = null;
+
+onMounted(() => {
+  fetchDoorId()
+  
+  intervalId = setInterval(() => {
+    fetchDoorId()
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (intervalId) {
+    clearInterval(intervalId)
+  }
+})
 </script>
 
 <style scoped>
