@@ -6,7 +6,7 @@
 </template>
 
 <script setup>
-await navigateTo('/login', {redirectCode : 301})
+await navigateTo('/dashboard', {redirectCode : 301})
 </script>
 
 <style scoped>

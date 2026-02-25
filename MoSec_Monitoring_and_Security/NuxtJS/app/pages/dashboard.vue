@@ -132,15 +132,15 @@ function handleLogout() {
 .dashboard-container {
   display: flex;
   height: 100vh;
-  background-color: #1a1a24; /* Background paling gelap */
+  background-color: var(--main-color); /* Background paling gelap */
   font-family: 'Inter', sans-serif;
-  color: #ffffff;
+  color: var(--black-blue);
   overflow: hidden;
 }
 
 .sidebar {
   width: 250px;
-  background-color: #222330;
+  background-color: var(--dark-blue);
   padding: 2rem 1.5rem;
   display: flex;
   flex-direction: column;
