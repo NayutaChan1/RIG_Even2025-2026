@@ -1,7 +1,7 @@
 <template>
     <div class="Overall-Page">
         <div class="Title-Login">
-            <h1>Mosec</h1>
+            <h1>MoSec</h1>
             <p>Monitoring & Security Lab</p>
         </div>
 
@@ -9,12 +9,12 @@
             
             <div class="Username-Initial">Initial / Username</div>
             <div class="Textbox-Username">
-                <input type="text" placeholder="Input Username" />
+                <input v-model="username" class="Value-Username" type="text" placeholder="Input Username" />
             </div>
 
             <div class="Password-Text">Password</div>
             <div class="Textbox-Password">
-                <input type="password" placeholder="••••••••" />
+                <input v-model="password" class="Value-Password" type="password" placeholder="••••••••" />
             </div>
 
             <div class="Login-Button">
@@ -26,8 +26,14 @@
 </template>
 
 <script setup>
+const username = ref('')
+const password = ref('')
+
 const handleLogin = () => {
-    navigateTo('/dashboard')
+    console.log('Username:', username.value)
+    console.log('Password:', password.value)
+    
+    // navigateTo('/dashboard')
 }
 </script>
 

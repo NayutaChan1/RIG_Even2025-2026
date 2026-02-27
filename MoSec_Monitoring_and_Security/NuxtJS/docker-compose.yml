@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16
+    container_name: mosec-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  nuxt:
+    build: .
+    container_name: mosec-nuxt
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - DATABASE_URL=postgresql://postgres:root@db:5432/postgres
+      - HOST=0.0.0.0
+      - PORT=3000
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

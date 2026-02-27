@@ -4,7 +4,7 @@
     <aside class="sidebar">
       <div class="logo-container">
         <div class="logo-icon"></div>
-        <h2>MOSEC</h2>
+        <h2>MoSec</h2>
       </div>
       
       <nav class="menu">
@@ -94,7 +94,7 @@
 
         <div class="card card-dark">
           <div class="card-header">
-            <span class="tag">⚠️ Lupa Dikunci</span>
+            <span class="tag">Lupa Dikunci</span>
           </div>
           <div class="card-body">
             <h1 class="big-number text-pink">3 Kali</h1>
@@ -154,7 +154,7 @@ onUnmounted(() => {
 .dashboard-container {
   display: flex;
   height: 100vh;
-  background-color: var(--main-color); /* Background paling gelap */
+  background-color: var(--main-color); 
   font-family: 'Inter', sans-serif;
   color: var(--black-blue);
   overflow: hidden;

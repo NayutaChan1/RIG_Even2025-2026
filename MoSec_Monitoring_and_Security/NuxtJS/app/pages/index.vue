@@ -1,6 +1,6 @@
 <template>
     <div>
-        <h1>Welcome To Mosec</h1>
+        <h1>Welcome To MoSec</h1>
         <p>Monitoring System</p>
     </div>
 </template>
