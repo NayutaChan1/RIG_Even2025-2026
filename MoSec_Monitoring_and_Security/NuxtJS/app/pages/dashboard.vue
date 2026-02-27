@@ -154,7 +154,7 @@ onUnmounted(() => {
 .dashboard-container {
   display: flex;
   height: 100vh;
-  background-color: #1a1a24; /* Background paling gelap */
+  background-color: #1a1a24;
   font-family: 'Inter', sans-serif;
   color: #ffffff;
   overflow: hidden;
