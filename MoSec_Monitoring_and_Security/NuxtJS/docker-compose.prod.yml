@@ -1,0 +1,33 @@
+name: nuxtjs-prod
+services:
+  db:
+    image: postgres:16
+    container_name: mosec-db-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres        # <-- Diperbaiki
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  
+  nuxt:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: mosec-nuxt-prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # <-- Diperbaiki: localhost diganti jadi 'db'
+      - DATABASE_URL=postgresql://postgres:root@db:5432/postgres
+    depends_on:
+      - db                           # <-- Diperbaiki: db-prod diganti jadi db
+    # Baris command npm DIHAPUS agar CMD dari Dockerfile.prod bisa bekerja
+
+# <-- Diperbaiki: Wajib mendaftarkan nama volume di sini
+volumes:
+  pgdata:

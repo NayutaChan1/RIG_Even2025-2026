@@ -1,5 +1,5 @@
 version: '3.8'
-
+name: nuxtjs
 services:
   db:
     image: postgres:16
@@ -7,24 +7,33 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root
-      POSTGRES_DB: postgres
+      POSTGRES_DB: postgres 
+    ports:
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
   nuxt:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: mosec-nuxt
     ports:
       - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - .:/app
       - /app/node_modules
     environment:
       - DATABASE_URL=postgresql://postgres:root@db:5432/postgres
-      - HOST=0.0.0.0
-      - PORT=3000
+      - NUXT_HOST=0.0.0.0 
+      - NUXT_PORT=3000
+      - CHOKIDAR_USEPOLLING=true
+    command: npx nuxt dev --host 0.0.0.0
     depends_on:
       - db
 
 volumes:
   pgdata:
+  
