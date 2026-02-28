@@ -26,14 +26,29 @@
 </template>
 
 <script setup>
+
 const username = ref('')
 const password = ref('')
 
-const handleLogin = () => {
+const handleLogin = async () => {
     console.log('Username:', username.value)
     console.log('Password:', password.value)
     
-    // navigateTo('/dashboard')
+    try {
+        const response = await $fetch('/api/auth/login', {
+            method: 'POST',
+            body: {
+                initial: username.value,
+                password: password.value
+            }
+        })
+
+        if(response.success){
+            navigateTo('/dashboard')
+        }
+    } catch (error) {
+        console.log(error)
+    }
 }
 </script>
 
