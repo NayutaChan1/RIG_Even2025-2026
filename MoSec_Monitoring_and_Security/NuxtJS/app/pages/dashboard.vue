@@ -9,13 +9,13 @@
       
       <nav class="menu">
         <a href="#" class="menu-item active">
-          <span class="icon">⊞</span> Dashboard
+          <span class="icon">▦</span> Dashboard
         </a>
         <a href="#" class="menu-item">
-          <span class="icon">📄</span> Laporan
+          <span class="icon">▤</span> Laporan
         </a>
         <a href="#" class="menu-item">
-          <span class="icon">⚙️</span> Pengaturan
+          <span class="icon">⚙</span> Pengaturan
         </a>
       </nav>
 
@@ -23,12 +23,12 @@
         <div class="user-card">
           <div class="user-avatar">A</div>
           <div class="user-details">
-            <p class="username">Admin</p>
-            <p class="email">admin@mosec.lab</p>
+            <p class="username">{{ authUser?.initial }}</p>
+            <p class="email">{{ authUser?.name }}</p>
           </div>
         </div>
         <button @click="handleLogout" class="logout-button">
-          <span class="icon">🚪</span>
+          <span class="icon">⎆</span>
           <span>Logout</span>
         </button>
       </div>
@@ -41,8 +41,8 @@
         <div class="profile-section">
           <div class="avatar">A</div>
           <div class="user-info">
-            <p class="user-name">Admin</p>
-            <p class="user-role">Administrator</p>
+            <p class="user-name">{{ authUser?.initial }}</p>
+            <p class="user-role">{{ authUser?.name }}</p>
           </div>
         </div>
       </header>
@@ -51,7 +51,7 @@
         
         <div class="card card-purple" @click="toggleProyektor">
           <div class="card-header">
-            <span class="tag">📽️ Status Proyektor</span>
+            <span class="tag">▶ Status Proyektor</span>
           </div>
           <div class="card-body">
             <h1 class="big-number">{{ statusProyektor }}</h1>
@@ -61,21 +61,17 @@
         </div>
 
         <div class="card card-pink">
-        <!-- <div class="card card-pink" @click="togglePintu"> -->
           <div class="card-header">
-            <span class="tag">🔒 Kunci Ruangan</span>
+            <span class="tag">◈ Kunci Ruangan</span>
           </div>
           <div class="card-body">
             <p>{{ statusPintuText }}</p>
-            <!-- <h1 class="big-number">{{ statusPintu }}</h1>
-            <p v-if="statusPintu === 'TERKUNCI'">Aman & Terkunci Rapat</p> -->
-            <!-- <p v-else>BAHAYA: Pintu Terbuka!</p> -->
           </div>
         </div>
 
         <div class="card card-dark span-2">
           <div class="card-header">
-            <span class="tag">⏱️ Uptime Proyektor (Minggu Ini)</span>
+            <span class="tag">◷ Uptime Proyektor (Minggu Ini)</span>
           </div>
           <div class="card-body chart-container">
             <div class="chart-info">
@@ -111,6 +107,17 @@
 
 <script setup>
 
+definePageMeta({
+  middleware : () => {
+    const authUser = useCookie('auth_user')
+    if(!authUser.value){
+      return navigateTo('/login')
+    }
+  }
+})
+
+const authUser = useCookie('auth_user')
+
 const statusProyektor = ref('NYALA')
 const { doorId, fetchDoorId, updateDoorId } = useDoorStatus()
 console.log(doorId)
@@ -118,16 +125,13 @@ function toggleProyektor() {
   statusProyektor.value = statusProyektor.value === 'NYALA' ? 'MATI' : 'NYALA'
 }
 
-// function togglePintu() {
-//   statusPintu.value = statusPintu.value === 'TERKUNCI' ? 'TERBUKA' : 'TERKUNCI'
-// }
-
 
 const statusPintuText = computed(() => {  
   return doorId.value
 })
 
 function handleLogout() {
+  authUser.value = null
   navigateTo('/login')
 }
 
@@ -149,24 +153,31 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 .dashboard-container {
   display: flex;
   height: 100vh;
-  background-color: var(--main-color); 
+  background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
   font-family: 'Inter', sans-serif;
-  color: var(--black-blue);
+  color: #ffffff;
   overflow: hidden;
 }
 
 .sidebar {
-  width: 250px;
-  background-color: var(--dark-blue);
+  width: 260px;
+  background: rgba(37, 37, 58, 0.6);
+  backdrop-filter: blur(20px);
   padding: 2rem 1.5rem;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #2f3042;
+  border-right: 1px solid rgba(132, 148, 255, 0.2);
 }
 
 .logo-container {
@@ -177,10 +188,11 @@ onUnmounted(() => {
 }
 
 .logo-icon {
-  width: 24px;
-  height: 24px;
-  background: linear-gradient(135deg, #8b5cf6, #ec4899);
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #6367FF 0%, #8494FF 100%);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(99, 103, 255, 0.4);
 }
 
 .logo-container h2 {
@@ -202,21 +214,22 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  color: #a0a0b0;
+  color: #C9BEFF;
   text-decoration: none;
-  border-radius: 12px;
+  border-radius: 10px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: all 0.3s;
 }
 
 .menu-item:hover {
-  background-color: #2a2b3d;
+  background: rgba(26, 26, 46, 0.8);
   color: white;
 }
 
 .menu-item.active {
-  background-color: #6c48ff;
+  background: linear-gradient(135deg, #6367FF 0%, #8494FF 100%);
   color: white;
+  box-shadow: 0 4px 12px rgba(99, 103, 255, 0.3);
 }
 
 .bottom-menu {
@@ -224,7 +237,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #2f3042;
+  border-top: 1px solid rgba(132, 148, 255, 0.2);
 }
 
 .user-card {
@@ -232,14 +245,15 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background-color: #2a2b3d;
-  border-radius: 12px;
+  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid rgba(132, 148, 255, 0.2);
+  border-radius: 10px;
 }
 
 .user-avatar {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  background: #6367FF;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -262,7 +276,7 @@ onUnmounted(() => {
 .email {
   margin: 0;
   font-size: 0.75rem;
-  color: #a0a0b0;
+  color: #C9BEFF;
 }
 
 .logout-button {
@@ -271,21 +285,21 @@ onUnmounted(() => {
   justify-content: center;
   gap: 8px;
   padding: 12px;
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   color: white;
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.3s ease;
   width: 100%;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .logout-button:hover {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
 }
 
 .logout-button:active {
@@ -303,18 +317,18 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
-  background-color: #272835;
+  background: rgba(37, 37, 58, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(132, 148, 255, 0.2);
   padding: 1.5rem 2rem;
   border-radius: 16px;
 }
 
 .page-title {
   font-size: 1.8rem;
-  font-weight: 800;
+  font-weight: 700;
   margin: 0;
-  background: linear-gradient(90deg, #8b5cf6, #ec4899);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #6367FF;
 }
 
 .profile-section {
@@ -326,7 +340,7 @@ onUnmounted(() => {
 .avatar {
   width: 45px;
   height: 45px;
-  background: linear-gradient(135deg, #6c48ff, #8b5cf6);
+  background: #6367FF;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -351,7 +365,7 @@ onUnmounted(() => {
 .user-role {
   margin: 0;
   font-size: 0.8rem;
-  color: #a0a0b0;
+  color: #C9BEFF;
 }
 
 .bento-grid {
@@ -365,19 +379,21 @@ onUnmounted(() => {
 }
 
 .card {
-  border-radius: 24px;
+  border-radius: 16px;
   padding: 24px;
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: all 0.3s ease;
   min-height: 200px;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .tag {
@@ -395,25 +411,26 @@ onUnmounted(() => {
 }
 
 .card-purple {
-  background: linear-gradient(135deg, #6c48ff, #8b5cf6);
-  box-shadow: 0 10px 30px rgba(108, 72, 255, 0.3);
+  background: linear-gradient(135deg, #6367FF 0%, #8494FF 100%);
+  box-shadow: 0 8px 24px rgba(99, 103, 255, 0.3);
 }
 
 .card-pink {
-  background: linear-gradient(135deg, #ff4081, #ec4899);
-  box-shadow: 0 10px 30px rgba(236, 72, 153, 0.3);
+  background: linear-gradient(135deg, #8494FF 0%, #9FA9FF 100%);
+  box-shadow: 0 8px 24px rgba(132, 148, 255, 0.3);
 }
 
 .card-dark {
-  background-color: #272835;
+  background: rgba(37, 37, 58, 0.6);
+  backdrop-filter: blur(20px);
 }
 
 .text-pink {
-  color: #ec4899;
+  color: #FFDBFD;
 }
 
 .subtitle {
-  color: #a0a0b0;
+  color: #C9BEFF;
   font-size: 0.9rem;
 }
 
@@ -433,7 +450,7 @@ onUnmounted(() => {
 
 .css-bar-chart .bar {
   width: 40px;
-  background-color: #3f4056;
+  background-color: #8494FF;
   border-radius: 8px 8px 0 0;
   position: relative;
   transition: height 0.5s;
@@ -444,7 +461,7 @@ onUnmounted(() => {
   bottom: -25px;
   left: 5px;
   font-size: 0.8rem;
-  color: #a0a0b0;
+  color: #C9BEFF;
 }
 
 .wave-bg {
@@ -453,7 +470,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 60px;
-  background-color: #6c48ff;
+  background-color: #6367FF;
   border-radius: 50% 50% 0 0 / 100% 100% 0 0;
   opacity: 0.5;
 }

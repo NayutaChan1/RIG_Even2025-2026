@@ -8,12 +8,14 @@
 
 <style>
 :root {
-  --main-color: #fff;
-  --light-blue: #d4f0fc;
-  --sky-blue: #89d6fb;
-  --blue: #02a9f7;
-  --dark-blue: #02577a;
-  --black-blue: #01303f;
+  --primary: #02a9f7;
+  --secondary: #d4f0fc;
+  --text-primary: #fff;
+  --text-secondary: #b0b0b0;
+  --card: #1a1a1a;
+  --sidebar: #01303f;
+  --background: #0a0a0a;
+  
 }
 
 body {
