@@ -8,15 +8,18 @@
       </div>
       
       <nav class="menu">
-        <a href="#" class="menu-item active">
-          <span class="icon">▦</span> Dashboard
-        </a>
-        <a href="#" class="menu-item">
-          <span class="icon">▤</span> Laporan
-        </a>
-        <a href="#" class="menu-item">
-          <span class="icon">⚙</span> Pengaturan
-        </a>
+        <NuxtLink to="/dashboard" class="menu-item">
+          <span class="icon">▦</span> Global Overview
+        </NuxtLink>
+        <NuxtLink to="/ruangan" class="menu-item">
+          <span class="icon">⚡</span> Lab Monitoring
+        </NuxtLink>
+        <NuxtLink to="/laporan" class="menu-item">
+          <span class="icon">▤</span> Reports
+        </NuxtLink>
+        <NuxtLink to="/pengaturan" class="menu-item">
+          <span class="icon">⚙</span> Settings
+        </NuxtLink>
       </nav>
 
       <div class="bottom-menu">
@@ -35,78 +38,74 @@
     </aside>
 
     <main class="main-content">
-      
       <header class="topbar">
-        <h1 class="page-title">Dashboard Monitoring</h1>
-        <div class="profile-section">
-          <div class="avatar">A</div>
-          <div class="user-info">
-            <p class="user-name">{{ authUser?.initial }}</p>
-            <p class="user-role">{{ authUser?.name }}</p>
-          </div>
+        <div class="topbar-left">
+          <NuxtLink to="/ruangan" class="back-button">← Back</NuxtLink>
+          <h1 class="page-title">Monitoring {{ roomData?.roomName || roomId.toUpperCase() }}</h1>
         </div>
-      </header>
+        </header>
 
-      <div class="bento-grid">
+      <div class="bento-grid" v-if="roomData">
         
         <div class="card card-purple" @click="toggleProyektor">
-          <div class="card-header">
-            <span class="tag">▶ Status Proyektor</span>
-          </div>
+          <div class="card-header"><span class="tag">▶ Projector Status</span></div>
           <div class="card-body">
-            <h1 class="big-number">{{ statusProyektor }}</h1>
-            <p v-if="statusProyektor === 'NYALA'">Sedang digunakan saat ini</p>
-            <p v-else>Proyektor dimatikan</p>
+            <h1 class="big-number">{{ localProjectorStatus }}</h1>
+            <p v-if="localProjectorStatus === 'ON'">Currently in use</p>
+            <p v-else>Projector is turned off</p>
           </div>
         </div>
 
         <div class="card card-pink">
-          <div class="card-header">
-            <span class="tag">◈ Kunci Ruangan</span>
-          </div>
+          <div class="card-header"><span class="tag">◈ Room Lock</span></div>
           <div class="card-body">
-            <p>{{ statusPintuText }}</p>
+            <p style="font-size: 1.5rem; font-weight: 700;">{{ statusPintuText }}</p>
           </div>
         </div>
 
         <div class="card card-dark span-2">
-          <div class="card-header">
-            <span class="tag">◷ Uptime Proyektor (Minggu Ini)</span>
-          </div>
+          <div class="card-header"><span class="tag">◷ Projector Uptime (This Week)</span></div>
           <div class="card-body chart-container">
             <div class="chart-info">
-              <h1 class="big-number">24.3 Jam</h1>
-              <p class="subtitle">Total jam menyala</p>
+              <h1 class="big-number">{{ roomData.totalUptime }} Hours</h1>
+              <p class="subtitle">Total active hours</p>
             </div>
+            
             <div class="css-bar-chart">
-              <div class="bar" style="height: 40%;"><span>Sen</span></div>
-              <div class="bar" style="height: 70%;"><span>Sel</span></div>
-              <div class="bar" style="height: 100%; background: #6c48ff;"><span>Rab</span></div>
-              <div class="bar" style="height: 30%;"><span>Kam</span></div>
-              <div class="bar" style="height: 50%;"><span>Jum</span></div>
+              <div 
+                v-for="(item, index) in roomData.chartData" 
+                :key="index"
+                class="bar" 
+                :style="{ height: item.percent + '%', background: item.percent === 100 ? '#6c48ff' : '#8494FF' }"
+              >
+                <span>{{ item.day }}</span>
+              </div>
             </div>
+
           </div>
         </div>
 
         <div class="card card-dark">
-          <div class="card-header">
-            <span class="tag">Lupa Dikunci</span>
-          </div>
+          <div class="card-header"><span class="tag">Left Unlocked</span></div>
           <div class="card-body">
-            <h1 class="big-number text-pink">3 Kali</h1>
-            <p class="subtitle">Insiden bulan ini</p>
+            <h1 class="big-number text-pink">{{ roomData.unlockIncidents }} Times</h1>
+            <p class="subtitle">Incidents this month</p>
           </div>
           <div class="wave-bg"></div>
         </div>
 
       </div>
+      
+      <div v-else style="padding: 3rem; text-align: center;">
+         Memuat data ruangan...
+      </div>
+      
     </main>
 
   </div>
 </template>
 
 <script setup>
-
 definePageMeta({
   middleware : () => {
     const authUser = useCookie('auth_user')
@@ -116,32 +115,60 @@ definePageMeta({
   }
 })
 
+const route = useRoute()
 const authUser = useCookie('auth_user')
 
-const statusProyektor = ref('NYALA')
-const { doorId, fetchDoorId, updateDoorId } = useDoorStatus()
-console.log(doorId)
-function toggleProyektor() {
-  statusProyektor.value = statusProyektor.value === 'NYALA' ? 'MATI' : 'NYALA'
-}
+const roomId = computed(() => route.params.id)
 
+// Tarik data spesifik ruangan dari API baru
+const { data: roomData, refresh: refreshRoomData } = await useFetch('/api/dashboard/room', {
+  query: { roomId: roomId.value },
+  transform: (res) => res.data
+})
+
+// State lokal untuk memfasilitasi klik toggle proyektor sebelum masuk ke database
+const localProjectorStatus = ref('OFF')
+
+// Sinkronisasi status proyektor dari DB saat pertama kali load
+watchEffect(() => {
+  if (roomData.value) {
+    localProjectorStatus.value = roomData.value.projectorOn ? 'ON' : 'OFF'
+  }
+})
+
+// Asumsi Anda punya composable untuk sensor IoT pintu
+const { doorId, fetchDoorId } = useDoorStatus() 
 
 const statusPintuText = computed(() => {  
-  return doorId.value
+  // Jika ada data dari sensor IoT (doorId), utamakan itu. 
+  // Jika tidak, gunakan data dari PostgreSQL (roomData)
+  if (doorId.value) return doorId.value === 'closed' ? '🔒 Locked' : '🔓 Unlocked'
+  if (roomData.value) return roomData.value.doorLocked ? '🔒 Locked' : '🔓 Unlocked'
+  return 'Loading...'
 })
+
+function toggleProyektor() {
+  // 1. Ubah visualnya secara instan agar user tidak merasa lag
+  localProjectorStatus.value = localProjectorStatus.value === 'ON' ? 'OFF' : 'ON'
+  
+  // 2. NANTI DI SINI ANDA BISA TAMBAHKAN AXIOS/FETCH POST KE API UNTUK MERUBAH DATABASE
+  // await useFetch('/api/projector/toggle', { method: 'POST', body: { roomId: roomId.value } })
+}
 
 function handleLogout() {
   authUser.value = null
   navigateTo('/login')
 }
 
-let intervalId = null;
+let intervalId = null
 
 onMounted(() => {
-  fetchDoorId()
+  if (fetchDoorId) fetchDoorId()
   
+  // Refresh data database setiap 5 detik
   intervalId = setInterval(() => {
-    fetchDoorId()
+    if (fetchDoorId) fetchDoorId()
+    refreshRoomData()
   }, 5000)
 })
 
@@ -154,6 +181,25 @@ onUnmounted(() => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.back-button {
+  background: rgba(132, 148, 255, 0.2);
+  color: #C9BEFF;
+  padding: 8px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+.back-button:hover {
+  background: #6367FF;
+  color: white;
+}
 
 * {
   margin: 0;
@@ -226,7 +272,9 @@ onUnmounted(() => {
   color: white;
 }
 
-.menu-item.active {
+.menu-item.active,
+.menu-item.router-link-active,
+.menu-item.router-link-exact-active {
   background: linear-gradient(135deg, #6367FF 0%, #8494FF 100%);
   color: white;
   box-shadow: 0 4px 12px rgba(99, 103, 255, 0.3);
@@ -322,6 +370,34 @@ onUnmounted(() => {
   border: 1px solid rgba(132, 148, 255, 0.2);
   padding: 1.5rem 2rem;
   border-radius: 16px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid rgba(132, 148, 255, 0.3);
+  border-radius: 10px;
+  color: #C9BEFF;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.back-button:hover {
+  background: rgba(99, 103, 255, 0.2);
+  border-color: #6367FF;
+  color: white;
+  transform: translateX(-4px);
 }
 
 .page-title {
