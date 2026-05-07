@@ -1,14 +1,81 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+
+type SerialStatusEvent = {
+  status: string;
+  port_name?: string | null;
+  message?: string | null;
+};
+
+type SerialDataEvent = {
+  port_name: string;
+  data: string;
+};
 
 const isTapped = ref(false);
 const isLoading = ref(false);
+const serialStatus = ref<string>("idle");
+const serialPort = ref<string | null>(null);
+const lastSerialLine = ref<string>("");
 const transactionData = ref({
   room: "Lab 601",
   subject: "Artificial Intelligence",
   lecturer: "Dr. Aris Purwanto",
   time: "10:00 - 12:00",
   status: "In Progress"
+});
+
+let unlistenData: UnlistenFn | null = null;
+let unlistenStatus: UnlistenFn | null = null;
+let connectTimer: number | null = null;
+let connectInFlight = false;
+
+async function tryConnectCh340() {
+  if (connectInFlight) return;
+  connectInFlight = true;
+  try {
+    await invoke("serial_connect_ch340");
+  } catch (e) {
+    serialStatus.value = "not_found";
+    console.warn("serial_connect_ch340 failed:", e);
+  } finally {
+    connectInFlight = false;
+  }
+}
+
+onMounted(async () => {
+  unlistenData = await listen<SerialDataEvent>("serial-data", (event) => {
+    lastSerialLine.value = event.payload.data;
+    console.log("[serial-data]", event.payload.port_name, event.payload.data);
+  });
+
+  unlistenStatus = await listen<SerialStatusEvent>("serial-status", (event) => {
+    serialStatus.value = event.payload.status;
+    serialPort.value = event.payload.port_name ?? null;
+    if (event.payload.message) {
+      console.log("[serial-status]", event.payload.status, event.payload.message);
+    }
+  });
+
+  await tryConnectCh340();
+
+  connectTimer = window.setInterval(async () => {
+    if (serialStatus.value === "connected" || serialStatus.value === "connecting") return;
+    await tryConnectCh340();
+  }, 1000);
+});
+
+onBeforeUnmount(async () => {
+  if (connectTimer) window.clearInterval(connectTimer);
+  if (unlistenData) unlistenData();
+  if (unlistenStatus) unlistenStatus();
+  try {
+    await invoke("serial_disconnect");
+  } catch {
+    
+  }
 });
 
 async function handleTap() {
@@ -55,6 +122,14 @@ function checkAttendance() {
       <p class="tap-instruction">
         {{ isLoading ? 'Reading card...' : 'Please tap your Flazz card to begin' }}
       </p>
+      <div style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+        <div>
+          ESP32 Serial: {{ serialStatus }}<span v-if="serialPort"> ({{ serialPort }})</span>
+        </div>
+        <div v-if="lastSerialLine" style="margin-top: 0.25rem; max-width: 70vw; word-break: break-word;">
+          Last: {{ lastSerialLine }}
+        </div>
+      </div>
     </div>
 
     <div v-else class="dashboard">
