@@ -1,14 +1,17 @@
 use serde::Serialize;
 use std::{
-    io::Read,
+    io::{Read, Write},
     sync::{
         atomic::{AtomicBool, Ordering},
+        mpsc,
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
     time::Duration,
 };
 use tauri::{AppHandle, Emitter, State};
+
+use crate::network;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SerialPortEntry {
@@ -47,6 +50,7 @@ pub struct SerialManager {
 struct SerialManagerInner {
     stop_flag: Option<Arc<AtomicBool>>,
     thread: Option<JoinHandle<()>>,
+    tx: Option<mpsc::Sender<Vec<u8>>>,
     port_name: Option<String>,
     baud_rate: Option<u32>,
 }
@@ -139,6 +143,7 @@ pub fn serial_connect_ch340(
         inner.stop_flag = None;
         inner.port_name = None;
         inner.baud_rate = None;
+        inner.tx = None;
         inner.thread.take()
     };
 
@@ -159,6 +164,8 @@ pub fn serial_connect_ch340(
     let stop_flag_thread = Arc::clone(&stop_flag);
     let app_thread = app.clone();
     let port_name_thread = port_name.clone();
+
+    let (tx, rx) = mpsc::channel::<Vec<u8>>();
 
     let thread = thread::spawn(move || {
         let _ = app_thread.emit(
@@ -201,6 +208,20 @@ pub fn serial_connect_ch340(
         let mut line_buf: Vec<u8> = Vec::with_capacity(1024);
 
         while !stop_flag_thread.load(Ordering::Relaxed) {
+            while let Ok(bytes) = rx.try_recv() {
+                if let Err(e) = port.write_all(&bytes) {
+                    let _ = app_thread.emit(
+                        "serial-status",
+                        SerialStatusEvent {
+                            status: "error".into(),
+                            port_name: Some(port_name_thread.clone()),
+                            message: Some(format!("Serial write failed: {}", e)),
+                        },
+                    );
+                    break;
+                }
+            }
+
             match port.read(&mut buf) {
                 Ok(0) => {}
                 Ok(n) => {
@@ -270,6 +291,7 @@ pub fn serial_connect_ch340(
             .map_err(|_| "Serial state lock poisoned".to_string())?;
         inner.stop_flag = Some(stop_flag);
         inner.thread = Some(thread);
+        inner.tx = Some(tx);
         inner.port_name = Some(port_name.clone());
         inner.baud_rate = Some(baud_rate);
     }
@@ -284,6 +306,7 @@ pub fn serial_disconnect(state: State<'_, SerialManager>) -> Result<(), String> 
             .inner
             .lock()
             .map_err(|_| "Serial state lock poisoned".to_string())?;
+        inner.tx = None;
         (inner.stop_flag.take(), inner.thread.take())
     };
 
@@ -305,4 +328,40 @@ pub fn serial_disconnect(state: State<'_, SerialManager>) -> Result<(), String> 
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn serial_send_line(state: State<'_, SerialManager>, line: String) -> Result<(), String> {
+    let tx = {
+        let inner = state
+            .inner
+            .lock()
+            .map_err(|_| "Serial state lock poisoned".to_string())?;
+        inner
+            .tx
+            .clone()
+            .ok_or_else(|| "Serial not connected".to_string())?
+    };
+
+    let mut bytes = line.into_bytes();
+    if !bytes.ends_with(b"\n") {
+        bytes.push(b'\n');
+    }
+
+    tx.send(bytes)
+        .map_err(|_| "Failed to send to serial thread".to_string())
+}
+
+#[tauri::command]
+pub fn serial_send_pc_lan_ip(
+    state: State<'_, SerialManager>,
+    prefix: Option<String>,
+    prefer_dns_suffix: Option<String>,
+) -> Result<String, String> {
+    let ip = network::get_lan_ipv4_string_with_preference(prefer_dns_suffix.as_deref())?;
+    let prefix = prefix.unwrap_or_else(|| "IP:".to_string());
+    let line = format!("{}{}", prefix, ip);
+
+    serial_send_line(state, line)?;
+    Ok(ip)
 }

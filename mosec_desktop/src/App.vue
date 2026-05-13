@@ -51,6 +51,9 @@ let unlistenData: UnlistenFn | null = null;
 let unlistenStatus: UnlistenFn | null = null;
 let connectTimer: number | null = null;
 let connectInFlight = false;
+let ipSentForConnection = false;
+
+const PREFERRED_DNS_SUFFIX = "binus.local";
 
 // ── Serial helpers ───────────────────────────────────────────────────
 async function tryConnectCh340() {
@@ -160,6 +163,22 @@ onMounted(async () => {
     serialPort.value = event.payload.port_name ?? null;
     if (event.payload.message) {
       console.log("[serial-status]", event.payload.status, event.payload.message);
+    }
+
+    // Once connected, push PC LAN IP to ESP32 so it can include it in the next JSON line.
+    if (event.payload.status === "connected" && !ipSentForConnection) {
+      ipSentForConnection = true;
+      invoke("serial_send_pc_lan_ip", {
+        prefix: "IP:",
+        prefer_dns_suffix: PREFERRED_DNS_SUFFIX,
+      }).catch((e) => {
+        console.warn("serial_send_pc_lan_ip failed:", e);
+        ipSentForConnection = false;
+      });
+    }
+
+    if (event.payload.status === "disconnected") {
+      ipSentForConnection = false;
     }
   });
 
