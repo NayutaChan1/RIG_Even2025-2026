@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, boolean, char, varchar } from 'drizzle-orm/pg-core';
 
 // =========================
 // 1. USERS
@@ -6,11 +6,21 @@ import { pgTable, text, timestamp, integer, boolean } from 'drizzle-orm/pg-core'
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  flazz: text('flazz').unique(),
-  hash_pass: text('hash_pass').notNull(),
+  flazz: char('flazz', { length: 8 }).unique(),
+  hash_pass: varchar('hash_pass', { length: 255 }).notNull(),
   initial: text('initial').notNull().unique(),
   created_at: timestamp('created_at').defaultNow(),
 });
+
+// =========================
+// 1b. USERS_MESSIER (Flazz card → Messier credentials mapping)
+// =========================
+export const users_messier = pgTable('users_messier', {
+  flazz_id: char('flazz_id', { length: 8 }).primaryKey(),
+  initial: text('initial').notNull(),
+  messier_password: varchar('messier_password', { length: 255 }).notNull(),
+});
+
 
 // =========================
 // 2. ROOMS

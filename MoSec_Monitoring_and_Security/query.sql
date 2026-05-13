@@ -4,14 +4,24 @@
 CREATE TABLE users (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    flazz TEXT,
-    hash_pass TEXT NOT NULL,
+    flazz CHAR(8),
+    hash_pass VARCHAR(255) NOT NULL,
     initial TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =========================
+-- USERS_MESSIER (Flazz card -> Messier credentials)
+-- =========================
+CREATE TABLE users_messier (
+    flazz_id CHAR(8) PRIMARY KEY,
+    initial TEXT NOT NULL,
+    messier_password VARCHAR(255) NOT NULL
+);
+
+-- =========================
 -- ROOMS
+
 -- =========================
 CREATE TABLE rooms (
     id TEXT PRIMARY KEY,
@@ -55,6 +65,19 @@ CREATE TABLE projector_history (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_room_history
+        FOREIGN KEY (room_id)
+        REFERENCES rooms(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE room_lock_history (
+    id TEXT PRIMARY KEY,
+    room_id TEXT NOT NULL,
+    status TEXT CHECK (status IN ('open', 'closed')) NOT NULL,
+    
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_room_lock_history
         FOREIGN KEY (room_id)
         REFERENCES rooms(id)
         ON DELETE CASCADE
