@@ -3,10 +3,12 @@
 #include <HTTPClient.h>
 
 const char* ssid = "BinusWifi-Staff.2.4Ghz"; 
-#define EAP_IDENTITY "MASUKANUSERNAME" 
-#define EAP_PASSWORD "MASUKANPASSWORD"
+#define EAP_IDENTITY "rafael.febrian@binus.edu" 
+#define EAP_PASSWORD "317301#20060205"
 
-String serverName = "http://10.20.176.199:3000/api/projector"; 
+String serverName = "http://10.20.179.187:3000/api/projector"; 
+
+const String roomNumber = "729"; 
 
 const int ldrPin = 34; 
 
@@ -56,7 +58,7 @@ void loop() {
     
     String statusProjector = (nilaiSensor < 2000) ? "NYALA" : "MATI";
     
-    String payload = "{\"status\": \"" + statusProjector + "\", \"nilai_cahaya\": " + String(nilaiSensor) + "}";
+    String payload = "{\"room\": \"" + roomNumber + "\", \"status\": \"" + statusProjector + "\", \"nilai_cahaya\": " + String(nilaiSensor) + "}";
 
     Serial.print("Kirim ke Server: ");
     Serial.println(payload);
