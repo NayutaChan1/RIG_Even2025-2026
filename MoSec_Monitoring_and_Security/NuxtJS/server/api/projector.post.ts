@@ -41,12 +41,27 @@ export default defineEventHandler(async (event) => {
             await db.insert(projector_history).values({
                 id: randomUUID(),
                 room_id: roomId,
-                turned_on_at: sql`NOW()`
+                turned_on_at: sql`NOW()`,
+                nilai_cahaya: luxValue
             });
+        } else if (shouldBeOn && projectorIsOn) {
+            await db.execute(sql`
+                UPDATE projector_history
+                SET nilai_cahaya = ${luxValue}
+                WHERE id = (
+                    SELECT id
+                    FROM projector_history
+                    WHERE room_id = ${roomId}
+                        AND turned_off_at IS NULL
+                    ORDER BY turned_on_at DESC
+                    LIMIT 1
+                )
+            `);
         } else if (!shouldBeOn && projectorIsOn) {
             await db.execute(sql`
                 UPDATE projector_history
-                SET turned_off_at = NOW()
+                SET turned_off_at = NOW(),
+                    nilai_cahaya = ${luxValue}
                 WHERE id = (
                     SELECT id
                     FROM projector_history

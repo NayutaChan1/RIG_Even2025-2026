@@ -8,15 +8,21 @@
       </div>
       
       <nav class="menu">
-        <a href="#" class="menu-item active">
+        <NuxtLink to="/dashboard" class="menu-item">
           <span class="icon">⊞</span> Dashboard
-        </a>
-        <a href="#" class="menu-item">
+        </NuxtLink>
+        <NuxtLink to="/ruangan" class="menu-item">
+          <span class="icon">⚡</span> Lab Monitoring
+        </NuxtLink>
+        <NuxtLink to="/projector" class="menu-item">
+          <span class="icon">▶</span> Projector
+        </NuxtLink>
+        <NuxtLink to="/laporan" class="menu-item">
           <span class="icon">📄</span> Laporan
-        </a>
-        <a href="#" class="menu-item">
+        </NuxtLink>
+        <NuxtLink to="/pengaturan" class="menu-item">
           <span class="icon">⚙️</span> Pengaturan
-        </a>
+        </NuxtLink>
       </nav>
 
       <div class="bottom-menu">
@@ -214,7 +220,9 @@ onUnmounted(() => {
   color: white;
 }
 
-.menu-item.active {
+.menu-item.active,
+.menu-item.router-link-active,
+.menu-item.router-link-exact-active {
   background-color: #6c48ff;
   color: white;
 }

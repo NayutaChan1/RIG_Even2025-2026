@@ -14,6 +14,9 @@
         <NuxtLink to="/ruangan" class="menu-item">
           <span class="icon">⚡</span> Lab Monitoring
         </NuxtLink>
+        <NuxtLink to="/projector" class="menu-item">
+          <span class="icon">▶</span> Projector
+        </NuxtLink>
         <NuxtLink to="/laporan" class="menu-item">
           <span class="icon">▤</span> Reports
         </NuxtLink>

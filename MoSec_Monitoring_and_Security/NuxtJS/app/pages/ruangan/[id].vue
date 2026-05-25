@@ -14,6 +14,9 @@
         <NuxtLink to="/ruangan" class="menu-item">
           <span class="icon">⚡</span> Lab Monitoring
         </NuxtLink>
+        <NuxtLink to="/projector" class="menu-item">
+          <span class="icon">▶</span> Projector
+        </NuxtLink>
         <NuxtLink to="/laporan" class="menu-item">
           <span class="icon">▤</span> Reports
         </NuxtLink>
@@ -63,27 +66,7 @@
           </div>
         </div>
 
-        <div class="card card-dark span-2">
-          <div class="card-header"><span class="tag">◷ Projector Uptime (This Week)</span></div>
-          <div class="card-body chart-container">
-            <div class="chart-info">
-              <h1 class="big-number">{{ roomData.totalUptime }} Hours</h1>
-              <p class="subtitle">Total active hours</p>
-            </div>
-            
-            <div class="css-bar-chart">
-              <div 
-                v-for="(item, index) in roomData.chartData" 
-                :key="index"
-                class="bar" 
-                :style="{ height: item.percent + '%', background: item.percent === 100 ? '#6c48ff' : '#8494FF' }"
-              >
-                <span>{{ item.day }}</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        <ProjectorAnalyticsBento :room-id="roomId" :room-label="roomLabel" />
 
         <div class="card card-dark">
           <div class="card-header"><span class="tag">Left Unlocked</span></div>
@@ -119,6 +102,7 @@ const route = useRoute()
 const authUser = useCookie('auth_user')
 
 const roomId = computed(() => route.params.id)
+const roomLabel = computed(() => roomData.value?.roomName || `Lab ${String(roomId.value).toUpperCase()}`)
 
 // Tarik data spesifik ruangan dari API baru
 const { data: roomData, refresh: refreshRoomData } = await useFetch('/api/dashboard/room', {
