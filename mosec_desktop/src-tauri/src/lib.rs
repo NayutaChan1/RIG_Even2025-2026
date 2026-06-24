@@ -1,5 +1,6 @@
 mod serial;
 mod network;
+mod briefing;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -12,6 +13,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(serial::SerialManager::default())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             network::pc_get_lan_ipv4,
@@ -20,7 +22,8 @@ pub fn run() {
             serial::serial_connect_ch340,
             serial::serial_disconnect,
             serial::serial_send_line,
-            serial::serial_send_pc_lan_ip
+            serial::serial_send_pc_lan_ip,
+            briefing::save_ppt_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

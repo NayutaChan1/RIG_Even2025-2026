@@ -27,9 +27,12 @@ services:
       - /app/node_modules
     environment:
       - DATABASE_URL=postgresql://postgres:root@db:5432/postgres
-      - NUXT_HOST=0.0.0.0 
+      - NUXT_HOST=0.0.0.0
       - NUXT_PORT=3000
       - CHOKIDAR_USEPOLLING=true
+      # PythonServer runs on the host (python main.py), not in the compose
+      # network, so reach it via the Docker host gateway instead of localhost.
+      - NUXT_PYTHON_SERVER_URL=http://host.docker.internal:8000
     command: npx nuxt dev --host 0.0.0.0
     depends_on:
       - db

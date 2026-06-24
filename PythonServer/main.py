@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 from datetime import datetime
@@ -15,6 +16,21 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.oxml.ns import qn
 from pydantic import BaseModel, Field
 
+# Load all configuration from a .env file next to this script, so settings live
+# in one place instead of shell/$env exports. Must run before any os.environ.get.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ENV_PATH = os.path.join(_HERE, ".env")
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(_ENV_PATH)
+except ImportError:
+    if os.path.exists(_ENV_PATH):
+        print(
+            "[warn] python-dotenv not installed; .env ignored. "
+            "Run: pip install python-dotenv"
+        )
+
 API_BASE = os.environ.get(
     "BLUEJACK_API_BASE", "https://bluejack.binus.ac.id/lapi/api"
 ).rstrip("/")
@@ -27,7 +43,6 @@ ACAD_BOOK_API = os.environ.get(
     "25b2ee66d775d76afebe917160f40c953760bc2dcfafefca5640daab9293a532/acad-book",
 ).rstrip("/")
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_PPT_DIR = os.path.normpath(os.path.join(_HERE, "..", "PPT"))
 PPT_DIR = os.environ.get("PPT_TEMPLATE_DIR", _DEFAULT_PPT_DIR)
 
@@ -47,17 +62,117 @@ HTTP_TIMEOUT = float(os.environ.get("HTTP_TIMEOUT", "30"))
 SLIDE_HEADER_AND_QR_IDX = 1
 SLIDE_TABLE_IDX = 2
 
+# Defaults used in the assessment table when the course feed omits a field.
+DEFAULT_DURATION = os.environ.get("BRIEFING_DEFAULT_DURATION", "100 menit di awal")
+DEFAULT_PARTICIPANTS = os.environ.get("BRIEFING_DEFAULT_PARTICIPANTS", "1 orang")
+
+# --- Testing overrides (real data only; no hardcoded course data) ----------
+# Pretend "now" is a specific datetime so the server picks the REAL class that
+# was scheduled at that moment. ISO format, e.g. BRIEFING_NOW_OVERRIDE=2026-03-12T11:30:00
+NOW_OVERRIDE_RAW = os.environ.get("BRIEFING_NOW_OVERRIDE", "").strip()
+
+# Which schedule window to query. Production wants "future"; to reach past
+# sessions for testing set BRIEFING_SCHEDULE_MODE=all. When a NOW override is set
+# we default to "all" so historical classes are reachable.
+SCHEDULE_MODE = os.environ.get(
+    "BRIEFING_SCHEDULE_MODE", "all" if NOW_OVERRIDE_RAW else "future"
+).strip()
+
+# Schedule source:
+#   "classtransaction" - live ClassTransaction API, matched by assistant+day+shift
+#   "api"              - live Schedule/GetJobsAssistant (dated assistant duties)
+#   "file"             - TransactionSchedule.json (offline snapshot)
+SCHEDULE_SOURCE = os.environ.get(
+    "BRIEFING_SCHEDULE_SOURCE", "api"
+).strip().lower()
+TRANSACTION_FILE = os.environ.get(
+    "BRIEFING_TRANSACTION_FILE",
+    os.path.normpath(os.path.join(_HERE, "..", "TransactionSchedule.json")),
+)
+CLASS_TRANSACTION_URL = os.environ.get(
+    "CLASS_TRANSACTION_URL",
+    "https://bluejack.binus.ac.id/lapi/API/ClassTransaction/GetClassTransactionInSemester",
+)
+# Assistant code (e.g. "FB25-1") — normally comes from the card tap (request);
+# this is only a fallback for manual testing without the desktop.
+ASSISTANT_CODE = os.environ.get("BRIEFING_ASSISTANT_CODE", "").strip()
+# Optional exact class filter (e.g. "BB07"). Normally the day+shift+assistant
+# match is unique; the request's class_code (from the tapped room) takes priority.
+CLASS_CODE = os.environ.get("BRIEFING_CLASS_CODE", "").strip()
+
+# Day + shift to match. Hardcode for development (e.g. BRIEFING_DAY=4,
+# BRIEFING_SHIFT=15:20-17:00); leave EMPTY for realtime (derived from the
+# current weekday + time slot).
+DAY_HARDCODE = os.environ.get("BRIEFING_DAY", "").strip()
+SHIFT_HARDCODE = os.environ.get("BRIEFING_SHIFT", "").strip()
+
+# Standard Binus practicum shift windows, used to derive the current shift
+# in realtime mode.
+SHIFTS = [
+    "07:20-09:00",
+    "09:20-11:00",
+    "11:20-13:00",
+    "13:20-15:00",
+    "15:20-17:00",
+    "17:20-19:00",
+    "19:20-21:00",
+]
+
+
+def effective_now() -> datetime:
+    """Return the override datetime when configured, else the real wall clock."""
+    if NOW_OVERRIDE_RAW:
+        try:
+            return datetime.fromisoformat(NOW_OVERRIDE_RAW)
+        except ValueError:
+            pass
+    return datetime.now()
+
+
+def effective_day() -> int:
+    """ISO weekday (Mon=1..Sun=7) to match against — hardcoded or realtime."""
+    if DAY_HARDCODE:
+        try:
+            return int(DAY_HARDCODE)
+        except ValueError:
+            pass
+    return effective_now().isoweekday()
+
+
+def effective_shift() -> str | None:
+    """Shift window (e.g. "15:20-17:00") to match — hardcoded, else the slot
+    that contains the current time (None if outside all class hours)."""
+    if SHIFT_HARDCODE:
+        return SHIFT_HARDCODE
+    now_t = effective_now().time()
+    for shift in SHIFTS:
+        m = _SHIFT_RE.search(shift)
+        if not m:
+            continue
+        sh, sm, eh, em = (int(g) for g in m.groups())
+        if datetime.min.replace(hour=sh, minute=sm).time() <= now_t <= datetime.min.replace(
+            hour=eh, minute=em
+        ).time():
+            return shift
+    return None
+
 
 
 class GenerateRequest(BaseModel):
     line_group_link: str = Field(..., description="URL of the LINE group to encode in the QR")
     template_type: str = Field(..., description='"quiz" or "uap"')
+    # The assistant initial (e.g. "FB25-1") comes from the card tap via NuxtJS.
+    # Falls back to BRIEFING_ASSISTANT_CODE in .env when omitted (testing only).
+    assistant_code: str | None = Field(None, description="Assistant initial from the card tap")
+    # Optional class (e.g. "BB07") to disambiguate same-slot classes; in future
+    # this comes from the tapped room. Falls back to BRIEFING_CLASS_CODE.
+    class_code: str | None = Field(None, description="Class code to disambiguate")
 
 
 
 async def fetch_schedule(token: str) -> list[dict]:
     url = f"{API_BASE}/Schedule/GetJobsAssistant"
-    params = {"mode": "future", "semesterId": SEMESTER_ID}
+    params = {"mode": SCHEDULE_MODE, "semesterId": SEMESTER_ID}
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         r = await client.get(url, params=params, headers=headers)
@@ -76,6 +191,30 @@ async def fetch_schedule(token: str) -> list[dict]:
     return data
 
 
+async def fetch_class_transactions(token: str) -> list[dict]:
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        r = await client.get(
+            CLASS_TRANSACTION_URL,
+            params={"semesterId": SEMESTER_ID},
+            headers=headers,
+        )
+    if r.status_code == 401:
+        raise HTTPException(401, "Bluejack rejected the bearer token")
+    if r.status_code >= 400:
+        raise HTTPException(
+            502, f"ClassTransaction API returned {r.status_code}: {r.text[:200]}"
+        )
+    data = r.json()
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        for v in data.values():
+            if isinstance(v, list):
+                return v
+    raise HTTPException(502, "ClassTransaction API did not return a list")
+
+
 async def fetch_course_data(course_code: str) -> dict:
     url = f"{ACAD_BOOK_API}/{course_code}"
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
@@ -88,7 +227,7 @@ async def fetch_course_data(course_code: str) -> dict:
 
 
 def find_current_job(jobs: list[dict]) -> dict | None:
-    now = datetime.now()
+    now = effective_now()
     for job in jobs:
         start_raw = job.get("StartDate")
         end_raw = job.get("EndDate")
@@ -101,6 +240,67 @@ def find_current_job(jobs: list[dict]) -> dict | None:
             continue
         if start <= now <= end:
             return job
+    return None
+
+
+def load_transaction_schedule() -> list[dict]:
+    with open(TRANSACTION_FILE, encoding="utf-8") as f:
+        data = json.load(f)
+    return data if isinstance(data, list) else []
+
+
+# "Day" in TransactionSchedule is ISO weekday (Mon=1 .. Sun=7), confirmed against
+# real dates (BB07 is Day 1, and 30-Mar-2026 — a Monday — was a BB07 session).
+_SHIFT_RE = re.compile(r"(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})")
+
+
+def find_current_transaction(
+    entries: list[dict], assistant_code: str, class_code: str = ""
+) -> dict | None:
+    now = effective_now()
+    weekday = now.isoweekday()
+    for e in entries:
+        if e.get("Day") != weekday:
+            continue
+        m = _SHIFT_RE.search(e.get("Shift") or "")
+        if not m:
+            continue
+        sh, sm, eh, em = (int(g) for g in m.groups())
+        start = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
+        end = now.replace(hour=eh, minute=em, second=0, microsecond=0)
+        if not (start <= now <= end):
+            continue
+        if assistant_code and assistant_code.lower() not in (
+            e.get("Assistant") or ""
+        ).lower():
+            continue
+        if class_code and class_code.lower() != (e.get("Class") or "").strip().lower():
+            continue
+        return e
+    return None
+
+
+def find_class_transaction(
+    entries: list[dict],
+    assistant_code: str,
+    day: int,
+    shift: str | None,
+    class_code: str = "",
+) -> dict | None:
+    """Filter the live ClassTransaction list by assistant + day + shift (and
+    optionally class). The class code is read off the matched entry."""
+    for e in entries:
+        if e.get("Day") != day:
+            continue
+        if shift and (e.get("Shift") or "").strip() != shift.strip():
+            continue
+        if assistant_code and assistant_code.lower() not in (
+            e.get("Assistant") or ""
+        ).lower():
+            continue
+        if class_code and class_code.lower() != (e.get("Class") or "").strip().lower():
+            continue
+        return e
     return None
 
 
@@ -242,22 +442,22 @@ def set_cell_text_keep_format(cell, new_text: str) -> None:
     runs[0].text = new_text
 
 
-def populate_main_table(slide, template_type: str, info: dict) -> None:
-    table = None
+def _find_main_table(slide):
     for shape in slide.shapes:
         if not shape.has_table:
             continue
         first_col = [r.cells[0].text.strip() for r in shape.table.rows]
         if any(label in first_col for label in ("TM/Quiz", "UAP", "Proyek")):
-            table = shape.table
-            break
-    if table is None:
-        return
+            return shape.table
+    return None
 
-    target_label = "TM/Quiz" if template_type == "quiz" else "UAP"
+
+def _fill_component_row(
+    table, find_label: str, info: dict, new_label: str | None = None
+) -> None:
     target_row = None
     for row in table.rows:
-        if target_label in row.cells[0].text:
+        if find_label in row.cells[0].text:
             target_row = row
             break
     if target_row is None:
@@ -267,14 +467,50 @@ def populate_main_table(slide, template_type: str, info: dict) -> None:
     meeting = info.get("meeting")
     cells = list(target_row.cells)
 
-    if meeting is not None:
-        set_cell_text_keep_format(cells[2], str(meeting))
-    if parsed["participants"]:
-        set_cell_text_keep_format(cells[3], parsed["participants"])
-    if parsed["duration"]:
-        set_cell_text_keep_format(cells[4], parsed["duration"])
-    if parsed["max_file_size"]:
-        set_cell_text_keep_format(cells[6], parsed["max_file_size"])
+    # Optionally rename the row label (e.g. "TM/Quiz" -> "TM/Quiz 1").
+    if new_label:
+        set_cell_text_keep_format(cells[0], new_label)
+
+    set_cell_text_keep_format(cells[2], str(meeting) if meeting is not None else "-")
+    # Participants/duration fall back to a default when the feed omits them
+    # (max file size keeps a dash — there's no sensible default).
+    set_cell_text_keep_format(cells[3], parsed["participants"] or DEFAULT_PARTICIPANTS)
+    set_cell_text_keep_format(cells[4], parsed["duration"] or DEFAULT_DURATION)
+    set_cell_text_keep_format(cells[6], parsed["max_file_size"] or "-")
+
+
+def _is_exam(info: dict | None) -> bool:
+    comp = ((info or {}).get("component") or "").lower()
+    return "final" in comp or "exam" in comp or "uap" in comp
+
+
+def populate_main_table(slide, quiz_info: dict | None, uap_info: dict | None) -> None:
+    """Fill both assessment rows so the slide shows the full grading breakdown.
+    The Proyek row is left untouched (no project data in the course feed).
+
+    When a course has two non-exam components (e.g. Assignment 1 + Assignment 2,
+    no Final Exam) it's two quizzes, not quiz + UAP — so the rows are relabelled
+    "TM/Quiz 1" and "TM/Quiz 2"."""
+    table = _find_main_table(slide)
+    if table is None:
+        return
+
+    two_quizzes = (
+        quiz_info is not None
+        and uap_info is not None
+        and quiz_info is not uap_info
+        and not _is_exam(quiz_info)
+        and not _is_exam(uap_info)
+    )
+
+    if quiz_info:
+        _fill_component_row(
+            table, "TM/Quiz", quiz_info, "TM/Quiz 1" if two_quizzes else None
+        )
+    if uap_info:
+        _fill_component_row(
+            table, "UAP", uap_info, "TM/Quiz 2" if two_quizzes else None
+        )
 
 
 def populate_software_extension_table(
@@ -343,12 +579,14 @@ def build_pptx(
 
     info_list = course.get("info", []) or []
     software_list = course.get("software", []) or []
-    info_entry = pick_info_entry(info_list, template_type)
+    quiz_info = pick_info_entry(info_list, "quiz")
+    uap_info = pick_info_entry(info_list, "uap")
 
-    if info_entry:
-        populate_main_table(slide3, template_type, info_entry)
+    populate_main_table(slide3, quiz_info, uap_info)
 
-    extension = (info_entry or {}).get("extension", "") or ""
+    # Software/extension follow the requested template's primary assessment.
+    primary_info = quiz_info if template_type == "quiz" else uap_info
+    extension = (primary_info or {}).get("extension", "") or ""
     populate_software_extension_table(slide3, software_list, extension)
 
     out = io.BytesIO()
@@ -368,6 +606,16 @@ async def health() -> dict[str, Any]:
         "status": "ok",
         "ppt_dir": PPT_DIR,
         "templates": templates_ok,
+        "schedule_source": SCHEDULE_SOURCE,
+        "schedule_mode": SCHEDULE_MODE,
+        "assistant_code": ASSISTANT_CODE or None,
+        "class_code": CLASS_CODE or None,
+        "day_hardcode": DAY_HARDCODE or None,
+        "shift_hardcode": SHIFT_HARDCODE or None,
+        "effective_day": effective_day(),
+        "effective_shift": effective_shift(),
+        "now_override": NOW_OVERRIDE_RAW or None,
+        "effective_now": effective_now().isoformat(),
         "now": datetime.now().isoformat(),
     }
 
@@ -395,23 +643,61 @@ async def generate_briefing(
             500, f"Template file missing on server: {template_path}"
         )
 
-    jobs = await fetch_schedule(token)
-    current = find_current_job(jobs)
-    if not current:
-        raise HTTPException(
-            404,
-            "No scheduled class is active right now "
-            f"(checked {len(jobs)} jobs at {datetime.now().isoformat()})",
-        )
+    # Assistant initial + class come from the card tap (via the request); the
+    # .env values are only a fallback for local testing.
+    assistant = (req.assistant_code or ASSISTANT_CODE or "").strip()
+    class_code = (req.class_code or CLASS_CODE or "").strip()
 
-    kd_mtk, nama_mtk, kd_kelas = parse_description(current.get("Description", ""))
+    if SCHEDULE_SOURCE == "classtransaction":
+        entries = await fetch_class_transactions(token)
+        day = effective_day()
+        shift = effective_shift()
+        current = find_class_transaction(entries, assistant, day, shift, class_code)
+        if not current:
+            raise HTTPException(
+                404,
+                "No class transaction matched "
+                f"(assistant={assistant or 'any'}, day={day}, shift={shift or 'any'}, "
+                f"class={class_code or 'any'})",
+            )
+        description = (
+            f"{current.get('Subject', '')} {(current.get('Class') or '').strip()}"
+        )
+    elif SCHEDULE_SOURCE == "file":
+        entries = load_transaction_schedule()
+        current = find_current_transaction(entries, assistant, class_code)
+        if not current:
+            raise HTTPException(
+                404,
+                "No class in TransactionSchedule for "
+                f"{effective_now().isoformat()} "
+                f"(assistant={assistant or 'any'}, class={class_code or 'any'})",
+            )
+        # Build a description from Subject + Class, e.g.
+        # "COMP6799001-Database Technology" + "BB07" -> reuse parse_description.
+        description = (
+            f"{current.get('Subject', '')} {(current.get('Class') or '').strip()}"
+        )
+    else:
+        jobs = await fetch_schedule(token)
+        current = find_current_job(jobs)
+        if not current:
+            raise HTTPException(
+                404,
+                "No scheduled class is active "
+                f"(checked {len(jobs)} jobs for {effective_now().isoformat()})",
+            )
+        description = current.get("Description", "")
+
+    kd_mtk, nama_mtk, kd_kelas = parse_description(description)
 
     payload = await fetch_course_data(kd_mtk)
     try:
         course = payload["payloads"]["acad-book"]["course"][0]
     except (KeyError, IndexError, TypeError):
         raise HTTPException(
-            502, f"acad-book response missing payloads.acad-book.course[0] for {kd_mtk}"
+            502,
+            f"acad-book response missing payloads.acad-book.course[0] for {kd_mtk}",
         )
 
     pptx_bytes = build_pptx(

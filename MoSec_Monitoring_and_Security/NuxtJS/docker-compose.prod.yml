@@ -21,9 +21,13 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       # <-- Diperbaiki: localhost diganti jadi 'db'
       - DATABASE_URL=postgresql://postgres:root@db:5432/postgres
+      # PythonServer runs on the host, reach it via the Docker host gateway.
+      - NUXT_PYTHON_SERVER_URL=http://host.docker.internal:8000
     depends_on:
       - db                           # <-- Diperbaiki: db-prod diganti jadi db
     # Baris command npm DIHAPUS agar CMD dari Dockerfile.prod bisa bekerja

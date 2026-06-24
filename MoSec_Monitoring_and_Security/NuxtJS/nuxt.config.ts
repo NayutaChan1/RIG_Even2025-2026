@@ -7,6 +7,11 @@ export default defineNuxtConfig({
     port: 3000
   },
 
+  // Server-only runtime config. Override in production with NUXT_PYTHON_SERVER_URL.
+  runtimeConfig: {
+    pythonServerUrl: process.env.NUXT_PYTHON_SERVER_URL || 'http://localhost:8000',
+  },
+
   // Allow mosec_desktop (Tauri) to call API endpoints
   routeRules: {
     '/api/**': {

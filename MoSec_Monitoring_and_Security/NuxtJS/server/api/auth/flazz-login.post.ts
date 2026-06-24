@@ -4,6 +4,31 @@ import { users_messier } from '../../utils/schema';
 
 const MESSIER_LOGIN_URL = 'https://bluejack.binus.ac.id/lapi/API/Account/LogOn';
 
+/**
+ * The Bluejack LogOn response shape isn't strictly typed here, so pull the
+ * bearer token out of the most likely fields. This token is what the
+ * PythonServer needs to call the Schedule API when generating the briefing PPT.
+ */
+function extractToken(result: unknown): string | null {
+    if (typeof result === 'string') return result;
+    if (result && typeof result === 'object') {
+        const r = result as Record<string, unknown>;
+        for (const key of ['token', 'Token', 'accessToken', 'access_token', 'AccessToken', 'jwt', 'Jwt']) {
+            const v = r[key];
+            if (typeof v === 'string' && v.length > 0) return v;
+        }
+        // Sometimes nested under a user/data object.
+        for (const nestedKey of ['data', 'Data', 'user', 'User', 'result', 'Result']) {
+            const nested = r[nestedKey];
+            if (nested && typeof nested === 'object') {
+                const found = extractToken(nested);
+                if (found) return found;
+            }
+        }
+    }
+    return null;
+}
+
 export default defineEventHandler(async (event) => {
     const body = await readBody(event);
     const flazzId: string | undefined = body?.Flazz_id;
@@ -64,6 +89,8 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    const token = extractToken(messierResult);
+
     return {
         success: true,
         message: 'Login berhasil via Messier',
@@ -72,6 +99,8 @@ export default defineEventHandler(async (event) => {
             Intial: initial,
             Messier_Password: '********',
         },
+        // Bluejack bearer token — forwarded by the desktop to /api/briefing/generate-ppt.
+        token,
         messier: messierResult,
     };
 });

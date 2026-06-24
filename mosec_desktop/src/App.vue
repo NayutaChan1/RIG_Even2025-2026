@@ -2,6 +2,8 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { save } from "@tauri-apps/plugin-dialog";
 
 // ── Backend URL (NuxtJS server) ──────────────────────────────────────
 const BACKEND_URL = "http://localhost:3000";
@@ -38,6 +40,14 @@ const lastSerialLine = ref<string>("");
 const flazzCardId = ref<string>("");
 const loginError = ref<string>("");
 const authenticatedUser = ref<AuthenticatedUser | null>(null);
+
+// ── Briefing PPT state ───────────────────────────────────────────────
+const messierToken = ref<string>("");
+const assistantCode = ref<string>("");
+const lineGroupLink = ref<string>("");
+const pptLoading = ref(false);
+const pptStatus = ref<string>("");
+const pptError = ref<string>("");
 
 const transactionData = ref({
   room: "Lab 601",
@@ -124,6 +134,10 @@ async function sendFlazzLogin(payload: FlazzPayload): Promise<void> {
 
     // Login successful — populate dashboard
     authenticatedUser.value = result.messier || null;
+    messierToken.value = result.token || "";
+    // Assistant initial (e.g. "FB25-1") from the DB mapping / Messier login.
+    assistantCode.value =
+      result.mapped?.Intial || result.messier?.user?.Username || "";
     transactionData.value = {
       room: "Lab 601",
       subject: "Artificial Intelligence",
@@ -222,14 +236,118 @@ function resetTap() {
   isTapped.value = false;
   authenticatedUser.value = null;
   loginError.value = "";
+  messierToken.value = "";
+  assistantCode.value = "";
+  lineGroupLink.value = "";
+  pptStatus.value = "";
+  pptError.value = "";
 }
 
 function generateOutline() {
   alert("Generating Course Outline for " + transactionData.value.subject + "...");
 }
 
-function generatePPT() {
-  alert("Generating Briefing PPT for " + transactionData.value.subject + "...");
+/**
+ * Convert raw bytes to a base64 string in chunks (avoids call-stack overflow
+ * from String.fromCharCode(...hugeArray) on multi-MB PPTX files).
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000; // 32 KB per chunk
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, Array.from(slice));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Generate a Briefing PPT via NuxtJS -> PythonServer, then save + open it.
+ * @param templateType "quiz" (TM/Quiz) or "uap"
+ */
+async function generatePPT(templateType: "quiz" | "uap"): Promise<void> {
+  pptError.value = "";
+  pptStatus.value = "";
+
+  if (!messierToken.value) {
+    pptError.value = "Token Bluejack tidak tersedia. Silakan tap ulang kartu.";
+    return;
+  }
+  if (!lineGroupLink.value.trim()) {
+    pptError.value = "Link Group LINE wajib diisi (untuk QR code).";
+    return;
+  }
+
+  pptLoading.value = true;
+  pptStatus.value = "Menghubungi server & membuat PPT...";
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/briefing/generate-ppt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: messierToken.value,
+        template_type: templateType,
+        line_group_link: lineGroupLink.value.trim(),
+        assistant_code: assistantCode.value,
+      }),
+    });
+
+    if (!response.ok) {
+      // Error responses are JSON ({ message } / { statusMessage }).
+      let msg = `Server mengembalikan status ${response.status}`;
+      try {
+        const err = await response.json();
+        msg = err?.message || err?.statusMessage || msg;
+      } catch {
+        // keep generic message
+      }
+      pptError.value = msg;
+      return;
+    }
+
+    // Derive a filename from Content-Disposition (falls back to a sane default).
+    const disposition = response.headers.get("content-disposition") || "";
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    const filename = match?.[1] || `Briefing_${templateType}.pptx`;
+
+    // Let the user pick where to save (Save As). Cancel aborts.
+    pptStatus.value = "Pilih lokasi penyimpanan...";
+    const targetPath = await save({
+      defaultPath: filename,
+      filters: [{ name: "PowerPoint", extensions: ["pptx"] }],
+    });
+    if (!targetPath) {
+      pptStatus.value = "";
+      pptError.value = "Penyimpanan dibatalkan.";
+      return;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const base64 = bytesToBase64(bytes);
+
+    pptStatus.value = "Menyimpan file...";
+    const savedPath = await invoke<string>("save_ppt_file", {
+      filename,
+      base64Data: base64,
+      targetPath,
+    });
+
+    pptStatus.value = `Tersimpan: ${savedPath}`;
+
+    // Open the generated deck in the default app (PowerPoint).
+    try {
+      await openPath(savedPath);
+    } catch (e) {
+      console.warn("openPath failed:", e);
+    }
+  } catch (err) {
+    pptError.value = err instanceof Error ? err.message : "Network error";
+    console.error("[generate-ppt] Error:", err);
+  } finally {
+    pptLoading.value = false;
+  }
 }
 
 function checkAttendance() {
@@ -312,13 +430,68 @@ function checkAttendance() {
           <h2 class="card-title">Briefing PPT</h2>
         </div>
         <div class="card-content">
-          <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
             Create a professional presentation for the current briefing session.
           </p>
-          <button class="action-btn" @click="generatePPT">
-            <span>Generate PPT</span>
-            <span>✨</span>
-          </button>
+
+          <label
+            style="display: block; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.35rem;"
+          >
+            Link Group LINE (untuk QR)
+          </label>
+          <input
+            v-model="lineGroupLink"
+            type="text"
+            placeholder="https://line.me/ti/g/..."
+            :disabled="pptLoading"
+            style="
+              width: 100%;
+              padding: 0.6rem 0.75rem;
+              margin-bottom: 1rem;
+              border-radius: 8px;
+              border: 1px solid var(--glass-border);
+              background: rgba(255, 255, 255, 0.05);
+              color: var(--text-primary);
+              font-size: 0.9rem;
+              box-sizing: border-box;
+            "
+          />
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button
+              class="action-btn"
+              :disabled="pptLoading"
+              style="flex: 1;"
+              @click="generatePPT('quiz')"
+            >
+              <span>TM / Quiz</span>
+              <span>✨</span>
+            </button>
+            <button
+              class="action-btn"
+              :disabled="pptLoading"
+              style="flex: 1;"
+              @click="generatePPT('uap')"
+            >
+              <span>UAP</span>
+              <span>✨</span>
+            </button>
+          </div>
+
+          <div
+            v-if="pptLoading || pptStatus || pptError"
+            style="margin-top: 1rem; font-size: 0.85rem; word-break: break-word;"
+          >
+            <div v-if="pptLoading" style="color: var(--accent-primary);">
+              ⏳ {{ pptStatus || 'Memproses...' }}
+            </div>
+            <div v-else-if="pptError" style="color: #ff6b6b; font-weight: 600;">
+              ⚠ {{ pptError }}
+            </div>
+            <div v-else-if="pptStatus" style="color: #4ade80;">
+              ✓ {{ pptStatus }}
+            </div>
+          </div>
         </div>
       </div>
 
