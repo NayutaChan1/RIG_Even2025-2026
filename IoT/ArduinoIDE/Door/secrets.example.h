@@ -1,0 +1,5 @@
+#define WIFI_SSID "BinusWifi-Staff.2.4Ghz"
+#define WIFI_USN ""
+#define WIFI_PASS ""
+#define SERVER_URL ""
+#define ROOM_ID "626"

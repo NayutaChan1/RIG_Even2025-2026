@@ -1,14 +1,17 @@
 export default defineEventHandler(async (event) => {
     const body = await readBody(event)
-    const { id } = body
+    const { room, state } = body
 
     console.log('Data dari Sensor Pintu masuk:', body)
-    await useStorage('data').setItem('door-id', String(id));
+    await useStorage('data').setItems([
+        {key: 'room', value: String(room)}, 
+        {key: 'state', value: String(state)}
+    ]);
     
-
     return {
         success: true,
         message: 'Status pintu berhasil diupdate!',
-        id: id
+        room: room,
+        status: state
     }
 })

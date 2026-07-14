@@ -1,8 +1,10 @@
 export default defineEventHandler(async (event) => {
-    const id = await useStorage('data').getItem('door-id') || '';
+    const room = await useStorage('data').getItem('room') || '';
+    const state = await useStorage('data').getItem('state') || '';
 
     return {
         success: true,
-        id: id
+        room: room,
+        state: state
     };
 });
