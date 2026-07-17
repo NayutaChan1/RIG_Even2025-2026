@@ -4,7 +4,7 @@ export const useDoorStatus = () => {
   const fetchDoorId = async () => {
     try {
       const data = await $fetch('/api/door');
-      doorId.value = String(data.id);
+      doorId.value = String(data.room);
     } catch (error) {
       console.error('Gagal mengambil ID pintu:', error);
     }

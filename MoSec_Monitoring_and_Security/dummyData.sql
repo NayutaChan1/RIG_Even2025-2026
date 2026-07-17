@@ -16,6 +16,7 @@ INSERT INTO users_messier (flazz_id, initial, messier_password) VALUES
 
 
 INSERT INTO rooms (id, num, status, projector_status, projector_last_on, projector_last_off) VALUES
+('rm-626', 626, 'open', FALSE, NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day 22 hours'),
 ('rm-727', 727, 'open', TRUE, NOW() - INTERVAL '2 hours', NOW() - INTERVAL '1 day'),
 ('rm-725', 725, 'closed', FALSE, NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day 22 hours'),
 ('rm-729', 729, 'open', FALSE, NOW() - INTERVAL '5 hours', NOW() - INTERVAL '4 hours');

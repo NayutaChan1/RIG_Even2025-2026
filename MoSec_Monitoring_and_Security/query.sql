@@ -21,7 +21,6 @@ CREATE TABLE users_messier (
 
 -- =========================
 -- ROOMS
-
 -- =========================
 CREATE TABLE rooms (
     id TEXT PRIMARY KEY,

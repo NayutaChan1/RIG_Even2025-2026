@@ -27,6 +27,7 @@
 </template>
 
 <script setup>
+definePageMeta({ layout: false })
 
 const username = ref('')
 const password = ref('')
