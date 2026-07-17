@@ -59,7 +59,7 @@ export const projector_history = pgTable('projector_history', {
     .references(() => rooms.id, { onDelete: 'cascade' }),
   turned_on_at: timestamp('turned_on_at'),
   turned_off_at: timestamp('turned_off_at'),
-  nilai_cahaya: integer('nilai_cahaya'),
+  light_sensor_value: integer('light_sensor_value'),
   created_at: timestamp('created_at').defaultNow(),
 });
 

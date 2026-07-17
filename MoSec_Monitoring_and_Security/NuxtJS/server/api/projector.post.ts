@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
                 id: randomUUID(),
                 room_id: roomId,
                 turned_on_at: sql`NOW()`,
-                nilai_cahaya: luxValue
+                light_sensor_value: luxValue
             });
         } else if (shouldBeOn && projectorIsOn) {
             await db.execute(sql`
@@ -61,7 +61,7 @@ export default defineEventHandler(async (event) => {
             await db.execute(sql`
                 UPDATE projector_history
                 SET turned_off_at = NOW(),
-                    nilai_cahaya = ${luxValue}
+                    light_sensor_value = ${luxValue}
                 WHERE id = (
                     SELECT id
                     FROM projector_history

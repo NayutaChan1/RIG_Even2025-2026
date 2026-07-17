@@ -61,6 +61,7 @@ CREATE TABLE projector_history (
     room_id TEXT NOT NULL,
     turned_on_at TIMESTAMP,
     turned_off_at TIMESTAMP,
+    light_sensor_value INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_room_history
