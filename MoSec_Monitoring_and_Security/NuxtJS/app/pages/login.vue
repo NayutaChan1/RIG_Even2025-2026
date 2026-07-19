@@ -46,10 +46,11 @@ const handleLogin = async () => {
         })
 
         if(response.success){
-            const userData = response.user
-
             const authUser = useCookie('auth_user')
-            authUser.value = userData
+            authUser.value = {
+                ...response.user,
+                token: response.token,
+            }
             navigateTo('/dashboard')
         }
     } catch (error) {

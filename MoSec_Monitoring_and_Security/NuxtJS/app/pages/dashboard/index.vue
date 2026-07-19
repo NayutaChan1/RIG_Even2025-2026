@@ -1,8 +1,10 @@
 <template>
   <div class="bento-grid" v-if="summaryData">
-    
+
     <div class="card card-purple">
-      <div class="card-header"><span class="tag"><Zap :size="14" /> Active Lab Status</span></div>
+      <div class="card-header"><span class="tag">
+          <Zap :size="14" /> Active Lab Status
+        </span></div>
       <div class="card-body">
         <h1 class="big-number">{{ summaryData.activeLabs }}</h1>
         <p>Labs currently operating</p>
@@ -10,7 +12,9 @@
     </div>
 
     <div class="card card-pink">
-      <div class="card-header"><span class="tag"><AlertTriangle :size="14" /> Security Warnings</span></div>
+      <div class="card-header"><span class="tag">
+          <AlertTriangle :size="14" /> Security Warnings
+        </span></div>
       <div class="card-body">
         <h1 class="big-number text-warning">{{ summaryData.warnings }}</h1>
         <p v-if="summaryData.warnings > 0">Labs with active warnings</p>
@@ -19,7 +23,9 @@
     </div>
 
     <div class="card card-dark">
-      <div class="card-header"><span class="tag"><DoorOpen :size="14" /> Unlocked Incidents</span></div>
+      <div class="card-header"><span class="tag">
+          <DoorOpen :size="14" /> Unlocked Incidents
+        </span></div>
       <div class="card-body">
         <h1 class="big-number text-pink">{{ summaryData.unlockIncidents }}</h1>
         <p class="subtitle">Total this month</p>
@@ -28,20 +34,18 @@
     </div>
 
     <div class="card card-dark span-2">
-      <div class="card-header"><span class="tag"><Clock :size="14" /> Total Projector Uptime (Building)</span></div>
+      <div class="card-header"><span class="tag">
+          <Clock :size="14" /> Total Projector Uptime (Building)
+        </span></div>
       <div class="card-body chart-container">
         <div class="chart-info">
           <h1 class="big-number">{{ summaryData.totalUptime }} Hours</h1>
           <p class="subtitle">This week</p>
         </div>
-        
+
         <div class="css-bar-chart">
-          <div 
-            v-for="(item, index) in summaryData.chartData" 
-            :key="index"
-            class="bar" 
-            :style="{ height: item.percent + '%', background: item.percent === 100 ? '#6c48ff' : '#8494FF' }"
-          >
+          <div v-for="(item, index) in summaryData.chartData" :key="index" class="bar"
+            :style="{ height: item.percent + '%', background: item.percent === 100 ? '#6c48ff' : '#8494FF' }">
             <span>{{ item.day }}</span>
           </div>
         </div>
@@ -50,26 +54,25 @@
     </div>
 
     <div class="card card-gradient">
-      <div class="card-header"><span class="tag"><BarChart3 :size="14" /> Total Power Consumption</span></div>
+      <div class="card-header"><span class="tag">
+          <BarChart3 :size="14" /> Total Power Consumption
+        </span></div>
       <div class="card-body">
         <h1 class="big-number">{{ summaryData.totalPowerConsumption }} kWh</h1>
         <p class="subtitle">Projector power usage this week</p>
       </div>
     </div>
 
-    <div class="card card-info span-2">
-      <div class="card-header"><span class="tag"><BarChart3 :size="14" /> Lab Quick Access</span></div>
+    <div class="card card-info span-3">
+      <div class="card-header"><span class="tag">
+          <BarChart3 :size="14" /> Lab Quick Access
+        </span></div>
       <div class="card-body">
-        
+
         <div class="lab-quick-access">
-          <NuxtLink 
-            v-for="room in summaryData.rooms" 
-            :key="room.id"
-            :to="'/ruangan/' + room.id" 
-            class="lab-card"
-          >
-            <div class="lab-icon">{{ room.num }}</div>
-            <div class="lab-name">Lab {{ room.num }}</div>
+          <NuxtLink v-for="room in sortedRooms" :key="room.id" :to="'/room/' + room.id" class="lab-card">
+            <div class="lab-icon">{{ room.name }}</div>
+            <div class="lab-name">Lab {{ room.name }}</div>
             <div :class="['lab-status', room.status.toLowerCase()]">
               {{ room.status }}
             </div>
@@ -80,9 +83,9 @@
     </div>
 
   </div>
-  
+
   <div v-else style="text-align: center; padding: 50px;">
-     Memuat data...
+    Memuat data...
   </div>
 </template>
 
@@ -100,8 +103,30 @@ definePageMeta({
   middleware: 'auth',
 })
 
-const { data: summaryData } = await useFetch('/api/dashboard/global', {
+const { data: summaryData } = await useFetch('/api/analytics/global', {
   transform: (response) => response.data
+})
+
+// warning -> active -> ascending 
+const getRoomPriority = (room) => {
+  const status = String(room.status || '').toLowerCase()
+
+  if (status === 'warning') return 0
+  if (status === 'active') return 1
+
+  return 2
+}
+
+const sortedRooms = computed(() => {
+  if (!summaryData.value?.rooms) return []
+
+  return [...summaryData.value.rooms].sort((a, b) => {
+    const priorityDiff = getRoomPriority(a) - getRoomPriority(b)
+
+    if (priorityDiff !== 0) return priorityDiff
+
+    return String(a.name).localeCompare(String(b.name), undefined, { numeric: true })
+  })
 })
 </script>
 
@@ -114,6 +139,10 @@ const { data: summaryData } = await useFetch('/api/dashboard/global', {
 
 .span-2 {
   grid-column: span 2;
+}
+
+.span-3 {
+  grid-column: span 3;
 }
 
 .card {

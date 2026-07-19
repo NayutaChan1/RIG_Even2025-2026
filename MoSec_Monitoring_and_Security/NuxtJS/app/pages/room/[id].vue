@@ -1,42 +1,66 @@
 <template>
   <div class="bento-grid" v-if="roomData">
-        
-        <div class="card card-purple" @click="toggleProyektor">
-          <div class="card-header"><span class="tag"><Play :size="14" /> Projector Status</span></div>
-          <div class="card-body">
-            <h1 class="big-number">{{ localProjectorStatus }}</h1>
-            <p v-if="localProjectorStatus === 'ON'">Currently in use</p>
-            <p v-else>Projector is turned off</p>
-          </div>
-        </div>
 
-        <div class="card card-pink">
-          <div class="card-header"><span class="tag"><Lock :size="14" /> Room Lock</span></div>
-          <div class="card-body">
-            <p style="font-size: 1.5rem; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-              <Lock :size="20" v-if="isDoorLocked" />
-              <Unlock :size="20" v-else-if="isDoorLocked === false" />
-              {{ doorStatusText }}
-            </p>
-          </div>
-        </div>
+    <div class="room-header">
+      <h1>{{ roomData.roomName }}</h1>
+      <span class="status-badge" :class="roomData.status?.toLowerCase()">{{ roomData.status || 'Unknown' }}</span>
+    </div>
 
-        <ProjectorAnalyticsBento :room-id="roomId" :room-label="roomLabel" />
-
-        <div class="card card-dark">
-          <div class="card-header"><span class="tag">Left Unlocked</span></div>
-          <div class="card-body">
-            <h1 class="big-number text-pink">{{ roomData.unlockIncidents }} Times</h1>
-            <p class="subtitle">Incidents this month</p>
-          </div>
-          <div class="wave-bg"></div>
-        </div>
-
+    <!-- PROJECTOR STATUS -->
+    <div class="card card-purple" @click="toggleProyektor">
+      <div class="card-header"><span class="tag">
+          <Play :size="14" /> Projector Status
+        </span></div>
+      <div class="card-body">
+        <h1 class="big-number">{{ localProjectorStatus }}</h1>
+        <p v-if="localProjectorStatus === 'ON'">Currently in use</p>
+        <p v-else>Projector is turned off</p>
       </div>
-      
-      <div v-else style="padding: 3rem; text-align: center;">
-         Memuat data ruangan...
+    </div>
+
+    <!-- LOCK STATUS -->
+    <div class="card card-pink">
+      <div class="card-header"><span class="tag">
+          <Lock :size="14" /> Room Lock
+        </span></div>
+      <div class="card-body">
+        <p class="big-number">
+          <Lock :size="40" v-if="isDoorLocked" />
+          <Unlock :size="40" v-else-if="isDoorLocked === false" />
+          {{ doorStatusText }}
+        </p>
       </div>
+    </div>
+
+    <!-- ROOM UNLOCKED INCIDENT -->
+    <div class="card card-dark">
+      <div class="card-header"><span class="tag">Room Left Unlocked</span></div>
+      <div class="card-body">
+        <h1 class="big-number text-pink">{{ roomData.unlockIncidents }} Times (CHANGE DATA)</h1>
+        <p class="subtitle">Incidents this month</p>
+      </div>
+      <div class="wave-bg"></div>
+    </div>
+
+    <!-- PROJECTOR ON INCIDENT  -->
+    <!-- TODO change data -->
+    <div class="card card-dark">
+      <div class="card-header"><span class="tag">Projector Left On</span></div>
+      <div class="card-body">
+        <h1 class="big-number text-pink">{{ roomData.unlockIncidents }} Times</h1>
+        <p class="subtitle">Incidents this month</p>
+      </div>
+      <div class="wave-bg"></div>
+    </div>
+
+    <!-- PROJECTOR ANALYTICS -->
+    <ProjectorAnalyticsBento :room-id="roomId" :room-label="roomLabel" />
+
+  </div>
+
+  <div v-else style="padding: 3rem; text-align: center;">
+    Memuat data ruangan...
+  </div>
 </template>
 
 <script setup>
@@ -45,7 +69,7 @@ import { Play, Lock, Unlock } from '@lucide/vue'
 definePageMeta({
   title: 'Room Detail',
   middleware: 'auth',
-  backButton: { to: '/ruangan', label: '← Back' },
+  backButton: { to: '/room', label: '← Back' },
 })
 
 const route = useRoute()
@@ -53,7 +77,7 @@ const route = useRoute()
 const roomId = computed(() => route.params.id)
 const roomLabel = computed(() => roomData.value?.roomName || `Lab ${String(roomId.value).toUpperCase()}`)
 
-const { data: roomData, refresh: refreshRoomData } = await useFetch('/api/dashboard/room', {
+const { data: roomData, refresh: refreshRoomData } = await useFetch('/api/analytics/room', {
   query: { roomId: roomId.value },
   transform: (res) => res.data
 })
@@ -66,10 +90,10 @@ watchEffect(() => {
   }
 })
 
-const { doorId, fetchDoorId } = useDoorStatus()
+const { doorState, fetchDoorStatus } = useDoorStatus()
 
 const isDoorLocked = computed(() => {
-  if (doorId.value) return doorId.value === 'closed'
+  if (doorState.value) return doorState.value === 'closed'
   if (roomData.value) return roomData.value.doorLocked
   return null
 })
@@ -86,10 +110,10 @@ function toggleProyektor() {
 let intervalId = null
 
 onMounted(() => {
-  if (fetchDoorId) fetchDoorId()
+  fetchDoorStatus(roomId.value)
 
   intervalId = setInterval(() => {
-    if (fetchDoorId) fetchDoorId()
+    fetchDoorStatus(roomId.value)
     refreshRoomData()
   }, 5000)
 })
@@ -102,9 +126,48 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.room-header {
+  grid-column: span 2;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.room-header h1 {
+  margin: 0;
+}
+
+.status-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid #22c55e;
+}
+
+.status-badge.warning {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border: 1px solid #fbbf24;
+}
+
+.status-badge.inactive {
+  background: rgba(156, 163, 175, 0.2);
+  color: #9ca3af;
+  border: 1px solid #9ca3af;
+}
+
 .bento-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
@@ -120,9 +183,14 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.3s ease;
   min-height: 200px;
+  height: 200px;
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-header {
+  margin: 0 0 20px 0;
 }
 
 .card:hover {
@@ -142,8 +210,7 @@ onUnmounted(() => {
 }
 
 .big-number {
-  font-size: 3.5rem;
-  margin: 20px 0 5px 0;
+  font-size: 3.0rem;
   font-weight: 800;
 }
 

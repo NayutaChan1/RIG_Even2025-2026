@@ -18,10 +18,15 @@ WORKDIR /app
 
 COPY --from=build /app/.output/ ./
 
+# Auto-migrate: copy drizzle config + migrations, install drizzle-kit
+COPY drizzle.config.ts drizzle/ ./
+COPY server/utils/ ./server/utils/
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh && npm init -y && npm install drizzle-kit postgres tsx
+
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
 EXPOSE 3000
 
-# <-- Diperbaiki: Tambah titik (.) agar mengeksekusi di dalam WORKDIR /app
-CMD ["node", "./server/index.mjs"]
+CMD ["./docker-entrypoint.sh", "prod"]

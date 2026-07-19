@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
 import { db } from '../../utils/db';
-import { transactions, users, room_lock_history } from '../../utils/schema';
+import { transactions, users, door_lock_history } from '../../utils/schema';
 
 export default defineEventHandler(async () => {
   // 1. AMBIL DATA TRANSAKSI (Gabungkan dengan tabel Users untuk dapat Nama)
@@ -27,8 +27,8 @@ export default defineEventHandler(async () => {
 
   // 2. AMBIL DATA RIWAYAT KUNCI
   const rawLockHistory = await db.select()
-    .from(room_lock_history)
-    .orderBy(desc(room_lock_history.recorded_at));
+    .from(door_lock_history)
+    .orderBy(desc(door_lock_history.recorded_at));
 
   // Format datanya
   const formattedLockHistory = rawLockHistory.map(lock => ({

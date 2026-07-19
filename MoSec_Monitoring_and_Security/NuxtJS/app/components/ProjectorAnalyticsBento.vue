@@ -3,7 +3,6 @@
     <div class="analytics-header">
       <div>
         <p class="eyebrow">Projector Analytics</p>
-        <h2>{{ roomLabelText }}</h2>
         <p class="lead">Single-day uptime analysis with daily and shift breakdowns.</p>
       </div>
       <span class="range-pill">Selected day</span>
@@ -20,6 +19,7 @@
       <p>{{ errorMessage }}</p>
     </div>
 
+    <!-- GRID -->
     <div v-else class="analytics-grid">
       <article class="metric-card metric-accent">
         <p class="metric-label">Total Uptime</p>
@@ -39,7 +39,7 @@
         <p class="metric-caption">{{ formatHours(topShiftHours) }} total uptime</p>
       </article>
 
-      <article class="metric-card span-2 chart-card">
+      <article class="metric-card chart-card">
         <div class="card-head">
           <div>
             <p class="metric-label">Daily Total Uptime</p>
@@ -180,6 +180,7 @@ function formatHours(hours?: number) {
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 .analytics-shell {
+  grid-column: span 2;
   border-radius: 24px;
   padding: 24px;
   background: linear-gradient(180deg, rgba(26, 26, 46, 0.96), rgba(18, 18, 32, 0.98));
@@ -277,6 +278,10 @@ function formatHours(hours?: number) {
   grid-column: span 2;
 }
 
+.span-3 {
+  grid-column: span 3;
+}
+
 .chart-card {
   gap: 14px;
 }
@@ -303,7 +308,7 @@ function formatHours(hours?: number) {
   grid-auto-flow: column;
   grid-auto-columns: 72px;
   gap: 10px;
-  align-items: end;
+  align-items: center;
   min-height: 220px;
 }
 
@@ -317,7 +322,7 @@ function formatHours(hours?: number) {
 .daily-bar-wrap {
   width: 100%;
   height: 150px;
-  border-radius: 18px;
+  border-radius: 8px;
   padding: 8px;
   display: flex;
   align-items: end;
@@ -327,7 +332,7 @@ function formatHours(hours?: number) {
 
 .daily-bar-fill {
   width: 100%;
-  border-radius: 12px;
+  border-radius: 2px;
   background: linear-gradient(180deg, #8494ff, #6c48ff);
   min-height: 10px;
 }

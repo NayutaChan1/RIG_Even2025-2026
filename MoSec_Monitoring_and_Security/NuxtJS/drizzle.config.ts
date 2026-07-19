@@ -5,6 +5,6 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    url: "postgresql://postgres:root@db:5432/postgres?sslmode=disable", 
+    url: "postgresql://postgres:root@db:5432/mosec?sslmode=disable", 
   },
 });

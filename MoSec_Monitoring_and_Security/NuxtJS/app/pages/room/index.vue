@@ -1,82 +1,43 @@
 <template>
   <div class="content-section">
-        <p class="description">
-          Select a lab you want to monitor to view detailed information about the projector status, door lock, and uptime.
-        </p>
-        
-        <div class="rooms-grid">
-          
-          <NuxtLink to="/ruangan/rm-724" class="room-card">
-            <div class="room-header">
-              <div class="room-number">724</div>
-              <div class="status-badge active">Active</div>
-            </div>
-            <div class="room-body">
-              <h3 class="room-name">Lab 724</h3>
-              <div class="room-stats">
-                <div class="stat-item">
-                  <span class="stat-icon"><Play :size="16" /></span>
-                  <span class="stat-label">Projector: On</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-icon"><Lock :size="16" /></span>
-                  <span class="stat-label">Door: Locked</span>
-                </div>
-              </div>
-            </div>
-            <div class="room-footer">
-              <span class="view-detail">View Details →</span>
-            </div>
-          </NuxtLink>
+    <p class="description">
+      Select a lab you want to monitor to view detailed information about the projector status, door lock, and uptime.
+    </p>
 
-          <NuxtLink to="/ruangan/rm-725" class="room-card">
-            <div class="room-header">
-              <div class="room-number">725</div>
-              <div class="status-badge warning">Warning</div>
-            </div>
-            <div class="room-body">
-              <h3 class="room-name">Lab 725</h3>
-              <div class="room-stats">
-                <div class="stat-item">
-                  <span class="stat-icon"><Play :size="16" /></span>
-                  <span class="stat-label">Projector: Off</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-icon"><Unlock :size="16" /></span>
-                  <span class="stat-label">Door: Unlocked</span>
-                </div>
-              </div>
-            </div>
-            <div class="room-footer">
-              <span class="view-detail">View Details →</span>
-            </div>
-          </NuxtLink>
-
-          <NuxtLink to="/ruangan/rm-726" class="room-card">
-            <div class="room-header">
-              <div class="room-number">726</div>
-              <div class="status-badge inactive">Inactive</div>
-            </div>
-            <div class="room-body">
-              <h3 class="room-name">Lab 726</h3>
-              <div class="room-stats">
-                <div class="stat-item">
-                  <span class="stat-icon"><Play :size="16" /></span>
-                  <span class="stat-label">Projector: Off</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-icon"><Lock :size="16" /></span>
-                  <span class="stat-label">Door: Locked</span>
-                </div>
-              </div>
-            </div>
-            <div class="room-footer">
-              <span class="view-detail">View Details →</span>
-            </div>
-          </NuxtLink>
-
+    <div v-if="rooms.length" class="rooms-grid">
+      <NuxtLink v-for="room in rooms" :key="room.id" :to="`/room/${room.id}`" class="room-card">
+        <div class="room-header">
+          <div class="room-number">{{ room.name }}</div>
+          <div class="status-badge" :class="room.badgeStatus">{{ room.badgeText }}</div>
         </div>
-      </div>
+        <div class="room-body">
+          <h3 class="room-name">{{ room.name }}</h3>
+          <div class="room-stats">
+            <div class="stat-item">
+              <span class="stat-icon"><Play :size="16" /></span>
+              <span class="stat-label">Projector: {{ room.projectorOn ? 'On' : 'Off' }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-icon" v-if="room.doorLocked"><Lock :size="16" /></span>
+              <span class="stat-icon" v-else><Unlock :size="16" /></span>
+              <span class="stat-label">Door: {{ room.doorLocked ? 'Locked' : 'Unlocked' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="room-footer">
+          <span class="view-detail">View Details →</span>
+        </div>
+      </NuxtLink>
+    </div>
+
+    <div v-else-if="!pending" style="padding: 3rem; text-align: center; color: #C9BEFF;">
+      No rooms available.
+    </div>
+
+    <div v-else style="padding: 3rem; text-align: center; color: #C9BEFF;">
+      Loading rooms...
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -86,6 +47,12 @@ definePageMeta({
   title: 'Lab Monitoring',
   middleware: 'auth',
 })
+
+const { data, pending } = await useFetch('/api/rooms', {
+  transform: (res) => res.data
+})
+
+const rooms = computed(() => data.value || [])
 </script>
 
 <style scoped>
