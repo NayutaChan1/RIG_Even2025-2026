@@ -96,10 +96,10 @@ void loop() {
   if (state != lastState) {
     lastState = state;
 
-    const char* stateStr = (state == LOW) ? "close" : "open";
+    const char* stateStr = (state == LOW) ? "locked" : "unlcoked";
 
     char payload[PAYLOAD_MAX];
-    snprintf(payload, PAYLOAD_MAX, "{\"room\":\"%s\",\"state\":\"%s\"}", ROOM_ID, stateStr);
+    snprintf(payload, PAYLOAD_MAX, "{\"roomId\":\"%s\",\"state\":\"%s\"}", ROOM_ID, stateStr);
 
     Serial.println(payload);
     xQueueSend(doorQueue, &payload, 0);
