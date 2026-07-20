@@ -23,12 +23,12 @@ export default defineEventHandler(async (event) => {
   const doorMap = new Map(doorResult.map(d => [d.room_id, d.status]));
   const projectorMap = new Map(projectorResult.map(p => [p.room_id, p.is_on]));
 
-// ACTIVE LABS =======================================================================================
+// // ACTIVE LABS =======================================================================================
 
   const allRooms = await db.select().from(rooms);
-  const activeLabsCount = allRooms.filter(r =>
-    doorMap.get(r.id) === 'open' && projectorMap.get(r.id)
-  ).length;
+//   const activeLabsCount = allRooms.filter(r =>
+//     doorMap.get(r.id) === 'open' && projectorMap.get(r.id)
+//   ).length;
 
 // UNLOCKED ROOMS INCIDENTS ==============================================================================
 
@@ -132,8 +132,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'No Messier token found' });
   }
 
+  // from active room borrowing (not transaction)
   const activeBorrowings = await getActiveBorrowings(parsed.token);
-
   const activeRoomSet = new Set(
     activeBorrowings.map(b => String(b.roomNumber))
   );
@@ -145,12 +145,14 @@ export default defineEventHandler(async (event) => {
 
     let status: "Active" | "Warning" | "Inactive";
 
-    if (isUnlocked && hasTransaction) {
-      status = "Active";
-    } else if (isUnlocked || projectorOn) {
-      status = "Warning";
+    if (hasTransaction) {
+      status = 'Active';
     } else {
-      status = "Inactive";
+      if (isUnlocked || projectorOn) {
+        status = "Warning";
+      } else {
+        status = "Inactive";
+      }
     }
 
     return {
@@ -160,11 +162,14 @@ export default defineEventHandler(async (event) => {
     };
   });
 
+  console.log(roomData.filter(rm => rm.status === 'Active'));
+  console.log(roomData.filter(rm => rm.status === 'Warning'));
+
   return {
     success: true,
     data: {
-      activeLabs: activeLabsCount, 
-      warnings: unlockIncidentsCount >= 3 ? 1 : 0, 
+      activeLabs: roomData.filter(rm => rm.status === 'Active').length, 
+      warnings: roomData.filter(rm => rm.status === 'Warning').length, 
       unlockIncidents: unlockIncidentsCount,
       totalUptime: totalUptimeHours.toFixed(1),
       totalPowerConsumption: totalPowerConsumption,

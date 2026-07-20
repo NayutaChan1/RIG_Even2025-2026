@@ -1,32 +1,43 @@
 <template>
   <div class="content-section">
-    <p class="description">
-      Select a lab you want to monitor to view detailed information about the projector status, door lock, and uptime.
-    </p>
+    <div class="page-header">
+      <div class="page-title">
+        <component :is="statusIcon" :size="24" />
+        <h2>{{ pageTitle }}</h2>
+      </div>
+      <p class="page-subtitle">{{ pageSubtitle }}</p>
+    </div>
 
-    <div v-if="rooms.length" class="rooms-grid">
-      <NuxtLink v-for="room in rooms" :key="room.id" :to="`/room/${room.id}`" class="room-card">
+    <div v-if="filteredRooms.length" class="rooms-grid">
+      <NuxtLink v-for="room in filteredRooms" :key="room.id" :to="`/room/${room.id}`" class="room-card">
         <div class="room-header">
           <div class="room-number">{{ room.name }}</div>
-          <div class="status-badge" :class="room.status.toLowerCase()">{{ room.status }}</div>
+          <div class="status-badge" :class="room.badgeStatus">{{ room.badgeText }}</div>
         </div>
         <div class="room-body">
-          <h3 class="room-name">Lab {{ room.name }}</h3>
+          <h3 class="room-name">{{ room.name }}</h3>
           <div class="room-stats">
             <div class="stat-item">
-              <span class="stat-icon"><Play :size="16" /></span>
+              <span class="stat-icon">
+                <Play :size="16" />
+              </span>
               <span class="stat-label">Projector: {{ room.projectorOn ? 'On' : 'Off' }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-icon" v-if="room.doorLocked"><Lock :size="16" /></span>
-              <span class="stat-icon" v-else><Unlock :size="16" /></span>
+              <span class="stat-icon" v-if="room.doorLocked">
+                <Lock :size="16" />
+              </span>
+              <span class="stat-icon" v-else>
+                <Unlock :size="16" />
+              </span>
               <span class="stat-label">Door: {{ room.doorLocked ? 'Locked' : 'Unlocked' }}</span>
             </div>
           </div>
         </div>
         <div v-if="room.borrower" class="room-borrower">
           <User :size="14" />
-          <span>{{ room.borrower.username }}<template v-if="room.borrower.division"> · {{ room.borrower.division }}</template></span>
+          <span>{{ room.borrower.username }}<template v-if="room.borrower.division"> · {{ room.borrower.division
+              }}</template></span>
         </div>
         <div class="room-footer">
           <span class="view-detail">View Details →</span>
@@ -34,29 +45,56 @@
       </NuxtLink>
     </div>
 
-    <div v-else-if="!pending" style="padding: 3rem; text-align: center; color: #C9BEFF;">
-      No rooms available.
+    <div v-else-if="!pending" class="empty-state">
+      <p>No labs with this status.</p>
     </div>
 
-    <div v-else style="padding: 3rem; text-align: center; color: #C9BEFF;">
-      Loading rooms...
+    <div v-else class="empty-state">
+      <p>Loading labs...</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Play, Lock, Unlock, User } from '@lucide/vue'
+import { Play, Lock, Unlock, Zap, AlertTriangle, User } from '@lucide/vue'
+
+const route = useRoute()
+const status = computed(() => route.params.status)
+
+const statusConfig = computed(() => {
+  const s = status.value
+  if (s === 'active') {
+    return {
+      title: 'Active Labs',
+      subtitle: 'Labs currently in use with door unlocked and projector on.',
+      icon: Zap,
+    }
+  }
+  return {
+    title: 'Security Warnings',
+    subtitle: 'Labs with door unlocked or projector left on without an active session.',
+    icon: AlertTriangle,
+  }
+})
+
+const pageTitle = computed(() => statusConfig.value.title)
+const pageSubtitle = computed(() => statusConfig.value.subtitle)
+const statusIcon = computed(() => statusConfig.value.icon)
 
 definePageMeta({
-  title: 'Lab Monitoring',
+  title: 'Lab Status',
   middleware: 'auth',
+  backButton: { to: '/dashboard', label: '← Back to Dashboard' },
 })
 
 const { data, pending } = await useFetch('/api/rooms', {
-  transform: (res) => res.data
+  transform: (res) => res.data,
 })
 
-const rooms = computed(() => data.value || [])
+const filteredRooms = computed(() => {
+  if (!data.value) return []
+  return data.value.filter((room) => room.status.toLowerCase() === status.value)
+})
 </script>
 
 <style scoped>
@@ -68,10 +106,28 @@ const rooms = computed(() => data.value || [])
   padding: 2rem;
 }
 
-.description {
-  color: #C9BEFF;
-  font-size: 1rem;
+.page-header {
   margin-bottom: 2rem;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.page-title h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.page-subtitle {
+  color: #C9BEFF;
+  font-size: 0.95rem;
+  margin: 0;
   line-height: 1.5;
 }
 
@@ -206,5 +262,11 @@ const rooms = computed(() => data.value || [])
   color: #8494FF;
   transform: translateX(4px);
   display: inline-block;
+}
+
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  color: #C9BEFF;
 }
 </style>

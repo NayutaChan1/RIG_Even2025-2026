@@ -53,6 +53,18 @@
       <div class="wave-bg"></div>
     </div>
 
+    <!-- BORROWER INFO -->
+    <div v-if="currentBorrower" class="card card-dark borrower-card">
+      <div class="card-header"><span class="tag">
+          <User :size="14" /> Current Borrower
+        </span></div>
+      <div class="card-body">
+        <h3 class="borrower-name">{{ currentBorrower.username }}</h3>
+        <p v-if="currentBorrower.identityCode" class="borrower-id">{{ currentBorrower.identityCode }}</p>
+        <p v-if="currentBorrower.division" class="borrower-division">{{ currentBorrower.division }}</p>
+      </div>
+    </div>
+
     <!-- PROJECTOR ANALYTICS -->
     <ProjectorAnalyticsBento :room-id="roomId" :room-label="roomLabel" />
 
@@ -64,7 +76,7 @@
 </template>
 
 <script setup>
-import { Play, Lock, Unlock } from '@lucide/vue'
+import { Play, Lock, Unlock, User } from '@lucide/vue'
 
 definePageMeta({
   title: 'Room Detail',
@@ -101,6 +113,11 @@ const isDoorLocked = computed(() => {
 const doorStatusText = computed(() => {
   if (isDoorLocked.value === null) return 'Loading...'
   return isDoorLocked.value ? 'Locked' : 'Unlocked'
+})
+
+const currentBorrower = computed(() => {
+  if (!roomData.value?.borrowing) return null
+  return roomData.value.borrowing.borrower || null
 })
 
 function toggleProyektor() {
@@ -266,6 +283,29 @@ onUnmounted(() => {
   left: 5px;
   font-size: 0.8rem;
   color: #C9BEFF;
+}
+
+.borrower-card {
+  cursor: default;
+}
+
+.borrower-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 8px 0;
+}
+
+.borrower-division {
+  color: #C9BEFF;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.borrower-id {
+  color: rgba(201, 190, 255, 0.6);
+  font-size: 0.85rem;
+  margin: 4px 0 0 0;
 }
 
 .wave-bg {

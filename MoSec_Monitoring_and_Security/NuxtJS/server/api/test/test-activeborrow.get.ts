@@ -1,11 +1,7 @@
 import { getCookie } from 'h3';
 
-const MESSIER_BASE = 'https://bluejack.binus.ac.id/lapi';
-const ROOMBORROWING_URL = `${MESSIER_BASE}/API/Room/GetRoomBorrowingTransactionsByDate`
-// const MESSIER_BASE = 'https://bluejack.binus.ac.id';
-// const ROOMBORROWING_URL = `${MESSIER_BASE}/borrowing/api/booking/transactions/active`
-const GETROOMS_URL = `${MESSIER_BASE}/API/Room/GetRooms`
-const TRANSACTIONS_URL = `${MESSIER_BASE}/API/Room/GetTransactions`
+const MESSIER_BASE = 'https://bluejack.binus.ac.id';
+const ROOMBORROWING_URL = `${MESSIER_BASE}/borrowing/api/booking/transactions/active`
 
 export default defineEventHandler(async (event) => {
   const authUser = getCookie(event, 'auth_user');

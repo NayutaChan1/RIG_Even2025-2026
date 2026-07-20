@@ -1,4 +1,5 @@
-const MESSIER_BASE = 'https://bluejack.binus.ac.id/lapi';
+const MESSIER_BASE = 'https://bluejack.binus.ac.id';
+const ROOMBORROWING_URL = `${MESSIER_BASE}/borrowing/api/booking/transactions/active`
 
 function todayRange() {
   const now = new Date();
@@ -22,7 +23,7 @@ export async function getActiveBorrowings(token: string) {
     includeOnsiteStatus: 'true',
   });
 
-  const response = await fetch(`${MESSIER_BASE}/API/Room/GetTransactions?${params}`, {
+  const response = await fetch(`${ROOMBORROWING_URL}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -33,8 +34,10 @@ export async function getActiveBorrowings(token: string) {
     throw new Error(`Messier API error: ${response.status}`);
   }
 
-  const rawData = await response.json();
+  let rawData = await response.json();
+  rawData = rawData.data;
   const transactions = Array.isArray(rawData) ? rawData : [];
+  console.log(transactions);
 
   return transactions.map(tx => ({
     id: tx.id,

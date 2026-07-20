@@ -38,23 +38,21 @@ export default defineEventHandler(async (event) => {
 
   // 2. Status ruangan dari Messier borrowings + sensor
   let roomStatus: 'Active' | 'Warning' | 'Inactive' = 'Inactive';
-  let borrowings: unknown[] = [];
+  let borrowing: unknown;
 
   const authUser = getCookie(event, 'auth_user');
   if (authUser) {
     try {
       const parsed = JSON.parse(authUser);
       if (parsed.token) {
-        const messierData = await getActiveBorrowings(parsed.token);
-        const transactions = extractTransactions(messierData);
-        borrowings = transactions;
+        const borrowings = await getActiveBorrowings(parsed.token);
 
         const roomName = room[0]!.name;
-        const hasBorrowing = transactions.some(tx =>
-          matchesRoom(tx, roomName)
-        );
+        borrowing = borrowings.filter(tx =>
+          tx.roomNumber == roomName
+        )[0];
 
-        if (hasBorrowing) {
+        if (borrowing) {
           roomStatus = 'Active';
         }
       }
@@ -63,10 +61,9 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // If no borrowing
   if (roomStatus !== 'Active') {
-    if (isOpen && projectorOn) {
-      roomStatus = 'Active';
-    } else if (isOpen && !projectorOn) {
+    if (isOpen || projectorOn) {
       roomStatus = 'Warning';
     } else {
       roomStatus = 'Inactive';
@@ -139,32 +136,7 @@ export default defineEventHandler(async (event) => {
       totalUptime: totalUptimeHours.toFixed(1),
       unlockIncidents: unlockIncidentsCount,
       chartData: chartData.length > 0 ? chartData : [{ day: '-', percent: 0 }],
-      borrowings,
+      borrowing,
     }
   };
 });
-
-function extractTransactions(data: unknown): unknown[] {
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === 'object') {
-    const d = data as Record<string, unknown>;
-    for (const key of ['data', 'Data', 'transactions', 'Transactions', 'value', 'Value', 'result', 'Result']) {
-      const v = d[key];
-      if (Array.isArray(v)) return v;
-    }
-  }
-  return [];
-}
-
-function matchesRoom(tx: unknown, roomName: string): boolean {
-  if (tx && typeof tx === 'object') {
-    const t = tx as Record<string, unknown>;
-    for (const key of ['room_id', 'RoomId', 'room', 'Room', 'roomNumber', 'RoomNumber', 'lab', 'Lab']) {
-      const v = t[key];
-      if (v !== undefined && v !== null) {
-        if (String(v) === roomName) return true;
-      }
-    }
-  }
-  return false;
-}

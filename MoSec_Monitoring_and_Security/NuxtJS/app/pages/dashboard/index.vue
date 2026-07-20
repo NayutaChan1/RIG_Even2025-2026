@@ -1,7 +1,7 @@
 <template>
   <div class="bento-grid" v-if="summaryData">
 
-    <div class="card card-purple">
+    <NuxtLink to="/dashboard/labs/active" class="card card-purple card-link">
       <div class="card-header"><span class="tag">
           <Zap :size="14" /> Active Lab Status
         </span></div>
@@ -9,9 +9,9 @@
         <h1 class="big-number">{{ summaryData.activeLabs }}</h1>
         <p>Labs currently operating</p>
       </div>
-    </div>
+    </NuxtLink>
 
-    <div class="card card-pink">
+    <NuxtLink to="/dashboard/labs/warning" class="card card-pink card-link">
       <div class="card-header"><span class="tag">
           <AlertTriangle :size="14" /> Security Warnings
         </span></div>
@@ -20,7 +20,7 @@
         <p v-if="summaryData.warnings > 0">Labs with active warnings</p>
         <p v-else>All labs are secure</p>
       </div>
-    </div>
+    </NuxtLink>
 
     <div class="card card-dark">
       <div class="card-header"><span class="tag">
@@ -321,7 +321,18 @@ const sortedRooms = computed(() => {
 }
 
 .lab-status.inactive {
-  background: rgba(156, 163, 175, 0.2);
-  color: #9ca3af;
+	background: rgba(156, 163, 175, 0.2);
+	color: #9ca3af;
+}
+
+.card-link {
+	text-decoration: none;
+	color: inherit;
+	cursor: pointer;
+}
+
+.card-link:hover {
+	transform: translateY(-4px);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 </style>

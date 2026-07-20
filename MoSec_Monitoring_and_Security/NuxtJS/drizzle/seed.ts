@@ -6,10 +6,6 @@ import { rooms } from "../server/utils/schema";
 async function seed() {
   await db.insert(rooms).values([
     {
-      id: "355224e6-84aa-df11-bca3-d8d385fce79c",
-      name: "329",
-    },
-    {
       id: "95ad125d-b6b4-df11-bca3-d8d385fce79c",
       name: "601",
     },
@@ -120,10 +116,6 @@ async function seed() {
     {
       id: "50948819-2f05-e711-9a56-d8d385fce79e",
       name: "724",
-    },
-    {
-      id: "d0fe749e-d5df-e311-8bb4-d8d385fce79c",
-      name: "724 Meeting Room",
     },
     {
       id: "725224e6-84aa-df11-bca3-d8d385fce79c",
