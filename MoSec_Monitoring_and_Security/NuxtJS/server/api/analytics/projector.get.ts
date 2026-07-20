@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../../utils/db';
-import { rooms } from '../../utils/schema';
+import { rooms, door_lock_history, projector_history } from '../../utils/schema';
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
@@ -17,16 +17,27 @@ export default defineEventHandler(async (event) => {
 
   const room = await db.select({
     id: rooms.id,
-    num: rooms.num,
-    status: rooms.status,
-    projectorStatus: rooms.projector_status,
-    projectorLastOn: rooms.projector_last_on,
-    projectorLastOff: rooms.projector_last_off,
+    name: rooms.name,
   }).from(rooms).where(eq(rooms.id, roomId)).limit(1);
 
   if (room.length === 0) {
     throw createError({ statusCode: 404, message: `Ruangan ${roomId} tidak ditemukan` });
   }
+
+  const doorResult = await db.execute(sql`
+    SELECT status FROM door_lock_history
+    WHERE room_id = ${roomId}
+    ORDER BY recorded_at DESC
+    LIMIT 1
+  `) as { status: string }[];
+
+  const projectorResult = await db.execute(sql`
+    SELECT turned_off_at IS NULL AS is_on
+    FROM projector_history
+    WHERE room_id = ${roomId}
+    ORDER BY turned_on_at DESC
+    LIMIT 1
+  `) as { is_on: boolean }[];
 
   const uptimeResult = await db.execute(sql`
     WITH clipped_sessions AS (
@@ -150,11 +161,9 @@ export default defineEventHandler(async (event) => {
     data: {
       room: {
         id: room[0]!.id,
-        num: room[0]!.num,
-        status: room[0]!.status,
-        projectorStatus: room[0]!.projectorStatus,
-        projectorLastOn: room[0]!.projectorLastOn,
-        projectorLastOff: room[0]!.projectorLastOff,
+        name: room[0]!.name,
+        doorStatus: doorResult.length > 0 ? doorResult[0]!.status : 'closed',
+        projectorStatus: projectorResult.length > 0 ? projectorResult[0]!.is_on : false,
       },
       windowDays: 30,
       uptime: {

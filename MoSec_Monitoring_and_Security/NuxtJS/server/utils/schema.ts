@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, boolean, char, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, char, varchar } from 'drizzle-orm/pg-core';
 
 // =========================
 // 1. USERS
@@ -21,17 +21,12 @@ export const users_messier = pgTable('users_messier', {
   messier_password: varchar('messier_password', { length: 255 }).notNull(),
 });
 
-
 // =========================
 // 2. ROOMS
 // =========================
 export const rooms = pgTable('rooms', {
   id: text('id').primaryKey(),
-  num: integer('num').notNull(),
-  status: text('status').notNull(), 
-  projector_status: boolean('projector_status').default(false),
-  projector_last_on: timestamp('projector_last_on'),
-  projector_last_off: timestamp('projector_last_off'),
+  name: text('name').notNull(),
 });
 
 // =========================
@@ -59,14 +54,14 @@ export const projector_history = pgTable('projector_history', {
     .references(() => rooms.id, { onDelete: 'cascade' }),
   turned_on_at: timestamp('turned_on_at'),
   turned_off_at: timestamp('turned_off_at'),
-  nilai_cahaya: integer('nilai_cahaya'),
+  light_sensor_value: integer('light_sensor_value'),
   created_at: timestamp('created_at').defaultNow(),
 });
 
 // =========================
-// 5. ROOM LOCK HISTORY
+// 5. DOOR LOCK HISTORY
 // =========================
-export const room_lock_history = pgTable('room_lock_history', {
+export const door_lock_history = pgTable('door_lock_history', {
   id: text('id').primaryKey(),
   room_id: text('room_id')
     .notNull()

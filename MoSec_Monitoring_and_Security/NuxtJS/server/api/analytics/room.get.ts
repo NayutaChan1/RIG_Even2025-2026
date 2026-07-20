@@ -1,6 +1,7 @@
 import { eq, sql, and } from 'drizzle-orm';
 import { db } from '../../utils/db';
-import { rooms, room_lock_history, projector_history } from '../../utils/schema';
+import { rooms, door_lock_history, projector_history } from '../../utils/schema';
+import { getActiveBorrowings } from '../../utils/borrow-status';
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
@@ -16,15 +17,68 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: `Ruangan ${targetRoomId} tidak ditemukan` });
   }
 
-  // 2. Insiden Pintu Lupa Dikunci (Spesifik Ruangan Ini)
+  // Current door & projector state from history
+  const doorResult = await db.execute(sql`
+    SELECT status FROM door_lock_history
+    WHERE room_id = ${targetRoomId}
+    ORDER BY recorded_at DESC
+    LIMIT 1
+  `) as { status: string }[];
+
+  const projectorResult = await db.execute(sql`
+    SELECT turned_off_at IS NULL AS is_on
+    FROM projector_history
+    WHERE room_id = ${targetRoomId}
+    ORDER BY turned_on_at DESC
+    LIMIT 1
+  `) as { is_on: boolean }[];
+
+  const isOpen = doorResult.length > 0 ? doorResult[0]!.status === 'open' : false;
+  const projectorOn = projectorResult.length > 0 ? projectorResult[0]!.is_on : false;
+
+  // 2. Status ruangan dari Messier borrowings + sensor
+  let roomStatus: 'Active' | 'Warning' | 'Inactive' = 'Inactive';
+  let borrowing: unknown;
+
+  const authUser = getCookie(event, 'auth_user');
+  if (authUser) {
+    try {
+      const parsed = JSON.parse(authUser);
+      if (parsed.token) {
+        const borrowings = await getActiveBorrowings(parsed.token);
+
+        const roomName = room[0]!.name;
+        borrowing = borrowings.filter(tx =>
+          tx.roomNumber == roomName
+        )[0];
+
+        if (borrowing) {
+          roomStatus = 'Active';
+        }
+      }
+    } catch {
+      // Messier unreachable — fall through to sensor-based status
+    }
+  }
+
+  // If no borrowing
+  if (roomStatus !== 'Active') {
+    if (isOpen || projectorOn) {
+      roomStatus = 'Warning';
+    } else {
+      roomStatus = 'Inactive';
+    }
+  }
+
+  // 3. Insiden Pintu Lupa Dikunci (Spesifik Ruangan Ini)
   const unlockIncidentsResult = await db.execute(sql`
     WITH paired_locks AS (
         SELECT 
             status,
             recorded_at AS opened_at,
             LEAD(recorded_at) OVER (ORDER BY recorded_at) AS closed_at
-        FROM room_lock_history
-        WHERE room_id = ${targetRoomId} -- Filter spesifik ruangan
+        FROM door_lock_history
+        WHERE room_id = ${targetRoomId}
     )
     SELECT COUNT(*)::int AS count
     FROM paired_locks
@@ -38,7 +92,7 @@ export default defineEventHandler(async (event) => {
   `);
   const unlockIncidentsCount = Number(unlockIncidentsResult[0]?.count || 0);
 
-  // 3. Uptime Proyektor Spesifik Ruangan (Minggu Ini)
+  // 4. Uptime Proyektor Spesifik Ruangan (Minggu Ini)
   const uptimeResult = await db.select({
     total_seconds: sql<number>`SUM(EXTRACT(EPOCH FROM (COALESCE(turned_off_at, NOW()) - turned_on_at)))`
   })
@@ -49,7 +103,7 @@ export default defineEventHandler(async (event) => {
   ));
   const totalUptimeHours = Number((uptimeResult[0]?.total_seconds || 0) / 3600);
 
-  // 4. Data Grafik Harian (Chart Data) Spesifik Ruangan
+  // 5. Data Grafik Harian (Chart Data) Spesifik Ruangan
   const dailyUptimeResult = await db.select({
     day_name: sql<string>`to_char(turned_on_at, 'Dy')`,
     day_idx: sql<number>`EXTRACT(ISODOW FROM turned_on_at)`,
@@ -75,12 +129,14 @@ export default defineEventHandler(async (event) => {
     success: true,
     data: {
       roomId: room[0]?.id,
-      roomName: `Lab ${room[0]?.num}`,
-      projectorOn: room[0]?.projector_status,
-      doorLocked: room[0]?.status === 'closed',
+      roomName: `Lab ${room[0]?.name}`,
+      status: roomStatus,
+      projectorOn,
+      doorLocked: !isOpen,
       totalUptime: totalUptimeHours.toFixed(1),
       unlockIncidents: unlockIncidentsCount,
-      chartData: chartData.length > 0 ? chartData : [{ day: '-', percent: 0 }]
+      chartData: chartData.length > 0 ? chartData : [{ day: '-', percent: 0 }],
+      borrowing,
     }
   };
 });

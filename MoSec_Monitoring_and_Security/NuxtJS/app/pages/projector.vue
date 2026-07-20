@@ -1,59 +1,5 @@
 <template>
-  <div class="dashboard-container">
-
-    <aside class="sidebar">
-      <div class="logo-container">
-        <div class="logo-icon"></div>
-        <h2>MoSec</h2>
-      </div>
-
-      <nav class="menu">
-        <NuxtLink to="/dashboard" class="menu-item">
-          <span class="icon">▦</span> Global Overview
-        </NuxtLink>
-        <NuxtLink to="/ruangan" class="menu-item">
-          <span class="icon">⚡</span> Lab Monitoring
-        </NuxtLink>
-        <NuxtLink to="/projector" class="menu-item">
-          <span class="icon">▶</span> Projector
-        </NuxtLink>
-        <NuxtLink to="/laporan" class="menu-item">
-          <span class="icon">▤</span> Reports
-        </NuxtLink>
-        <NuxtLink to="/pengaturan" class="menu-item">
-          <span class="icon">⚙</span> Settings
-        </NuxtLink>
-      </nav>
-
-      <div class="bottom-menu">
-        <div class="user-card">
-          <div class="user-avatar">A</div>
-          <div class="user-details">
-            <p class="username">{{ authUser?.initial }}</p>
-            <p class="email">{{ authUser?.name }}</p>
-          </div>
-        </div>
-        <button @click="handleLogout" class="logout-button">
-          <span class="icon">⎆</span>
-          <span>Logout</span>
-        </button>
-      </div>
-    </aside>
-
-    <main class="main-content">
-
-      <header class="topbar">
-        <h1 class="page-title">Projector Analytics</h1>
-        <div class="profile-section">
-          <div class="avatar">A</div>
-          <div class="user-info">
-            <p class="user-name">{{ authUser?.initial }}</p>
-            <p class="user-role">{{ authUser?.name }}</p>
-          </div>
-        </div>
-      </header>
-
-      <div class="content-wrapper">
+  <div class="content-wrapper">
 
         <div class="filter-section">
           <div class="filter-group">
@@ -84,11 +30,11 @@
 
           <div class="filter-actions">
             <button class="btn-filter" @click="applyFilter">
-              <span class="icon">🔍</span>
+              <Search :size="16" />
               Apply
             </button>
             <button class="btn-reset" @click="resetFilter">
-              <span class="icon">↻</span>
+              <RefreshCw :size="16" />
               Reset
             </button>
           </div>
@@ -113,24 +59,18 @@
         </div>
 
       </div>
-    </main>
-
-  </div>
 </template>
 
 <script setup>
+import { Search, RefreshCw } from '@lucide/vue'
+
 definePageMeta({
-  middleware: () => {
-    const authUser = useCookie('auth_user')
-    if (!authUser.value) {
-      return navigateTo('/login')
-    }
-  }
+  title: 'Projector Analytics',
+  middleware: 'auth',
 })
 
 const route = useRoute()
 const router = useRouter()
-const authUser = useCookie('auth_user')
 
 const todayIso = new Date().toISOString().slice(0, 10)
 
@@ -197,194 +137,9 @@ function resetFilter() {
   appliedDate.value = todayIso
   router.push({ path: '/projector', query: {} })
 }
-
-function handleLogout() {
-  authUser.value = null
-  navigateTo('/login')
-}
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-.dashboard-container {
-  display: flex;
-  height: 100vh;
-  background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
-  font-family: 'Inter', sans-serif;
-  color: #ffffff;
-  overflow: hidden;
-}
-
-.sidebar {
-  width: 260px;
-  background: rgba(37, 37, 58, 0.6);
-  backdrop-filter: blur(20px);
-  padding: 2rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid rgba(132, 148, 255, 0.2);
-}
-
-.logo-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 3rem;
-}
-
-.logo-icon {
-  width: 28px;
-  height: 28px;
-  background: linear-gradient(135deg, #6367FF 0%, #8494FF 100%);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(99, 103, 255, 0.4);
-}
-
-.logo-container h2 {
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 1px;
-  margin: 0;
-}
-
-.menu {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  color: #C9BEFF;
-  text-decoration: none;
-  border-radius: 10px;
-  font-weight: 500;
-  transition: all 0.3s;
-}
-
-.menu-item:hover {
-  background: rgba(26, 26, 46, 0.8);
-  color: white;
-}
-
-.menu-item.router-link-active,
-.menu-item.router-link-exact-active {
-  background: linear-gradient(135deg, #6367FF 0%, #8494FF 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(99, 103, 255, 0.3);
-}
-
-.bottom-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(132, 148, 255, 0.2);
-}
-
-.user-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: rgba(26, 26, 46, 0.8);
-  border: 1px solid rgba(132, 148, 255, 0.2);
-  border-radius: 10px;
-}
-
-.user-avatar {
-  width: 36px;
-  height: 36px;
-  background: #6367FF;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 0.9rem;
-}
-
-.user-details { flex: 1; }
-.username { margin: 0; font-weight: 600; font-size: 0.9rem; color: white; }
-.email { margin: 0; font-size: 0.75rem; color: #C9BEFF; }
-
-.logout-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  border: none;
-  border-radius: 10px;
-  color: white;
-  font-weight: 600;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-}
-
-.logout-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-}
-
-.main-content {
-  flex: 1;
-  padding: 2rem;
-  overflow-y: auto;
-}
-
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  background: rgba(37, 37, 58, 0.6);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(132, 148, 255, 0.2);
-  padding: 1.5rem 2rem;
-  border-radius: 16px;
-}
-
-.page-title {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin: 0;
-  color: #6367FF;
-}
-
-.profile-section { display: flex; align-items: center; gap: 12px; }
-
-.avatar {
-  width: 45px;
-  height: 45px;
-  background: #6367FF;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 1.1rem;
-}
-
-.user-info { display: flex; flex-direction: column; gap: 2px; }
-.user-name { margin: 0; font-weight: 600; font-size: 0.95rem; color: white; }
-.user-role { margin: 0; font-size: 0.8rem; color: #C9BEFF; }
-
 .content-wrapper {
   display: flex;
   flex-direction: column;

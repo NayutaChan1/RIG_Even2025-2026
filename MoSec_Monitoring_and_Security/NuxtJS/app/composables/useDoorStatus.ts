@@ -1,31 +1,35 @@
 export const useDoorStatus = () => {
-  const doorId = useState<string>('doorId', () => '');
-  
-  const fetchDoorId = async () => {
+  const doorState = useState<string>('doorState', () => '');
+
+  const fetchDoorStatus = async (roomId?: string) => {
     try {
-      const data = await $fetch('/api/door');
-      doorId.value = String(data.id);
+      const params = roomId ? { roomId } : {};
+      const data: any = await $fetch('/api/door', { params });
+      if (roomId) {
+        doorState.value = data.state;
+      } else if (data.data?.length) {
+        doorState.value = data.data[0]?.state || '';
+      }
     } catch (error) {
-      console.error('Gagal mengambil ID pintu:', error);
+      console.error('Gagal mengambil status pintu:', error);
     }
   };
-  
-  const updateDoorId = async (id: string) => {
+
+  const updateDoorStatus = async (roomName: string, state: string) => {
     try {
       await $fetch('/api/door', {
         method: 'POST',
-        body: { id }
+        body: { room: roomName, state }
       });
-      doorId.value = id;
-      console.log(doorId)
+      doorState.value = state;
     } catch (error) {
-      console.error('Gagal update ID pintu:', error);
+      console.error('Gagal update status pintu:', error);
     }
   };
-  
+
   return {
-    doorId: readonly(doorId),
-    fetchDoorId,
-    updateDoorId
+    doorState: readonly(doorState),
+    fetchDoorStatus,
+    updateDoorStatus
   };
 };
