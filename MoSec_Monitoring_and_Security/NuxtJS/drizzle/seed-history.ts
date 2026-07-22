@@ -27,7 +27,6 @@ function daysAgo(days: number, hour = 8, min = 0): Date {
 // ── Room ID lookup (must match keys in drizzle/seed.ts) ────────────────────
 
 const ROOM = {
-  "329": "355224e6-84aa-df11-bca3-d8d385fce79c",
   "601": "95ad125d-b6b4-df11-bca3-d8d385fce79c",
   "602": "96ad125d-b6b4-df11-bca3-d8d385fce79c",
   "603": "535224e6-84aa-df11-bca3-d8d385fce79c",
@@ -48,6 +47,7 @@ const ROOM = {
   "629": "655224e6-84aa-df11-bca3-d8d385fce79c",
   "630": "665224e6-84aa-df11-bca3-d8d385fce79c",
   "631": "675224e6-84aa-df11-bca3-d8d385fce79c",
+  "706": "b1ad125d-b6b4-df11-bca3-d8d385fce79c"
 } as const;
 
 // ── Seed function ──────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ async function seedHistory() {
   // Door: was closed, opened 30 min ago → currently open, no incident (<2h)
   // Projector: turned on 2h ago, still on → currently on
   {
-    const rid = ROOM["329"];
+    const rid = ROOM["706"];
     doorRecords.push(
       { id: uid(), room_id: rid, status: "closed", recorded_at: hoursAgo(2, 30) },
       { id: uid(), room_id: rid, status: "open", recorded_at: hoursAgo(0, 30) },
@@ -370,7 +370,7 @@ async function seedHistory() {
   console.log("\n── Edge Case Scenarios Seeded ──\n");
 
   const summary: { room: string; door: string; projector: string; status: string }[] = [
-    { room: "329", door: "open (30m ago)", projector: "on (2h, still on)", status: "Active / Warning" },
+    { room: "706", door: "open (30m ago)", projector: "on (2h, still on)", status: "Active / Warning" },
     { room: "601", door: "open (3h ago) ← INCIDENT", projector: "on→off (1h ago)", status: "Warning" },
     { room: "602", door: "no records (closed)", projector: "no records (off)", status: "Inactive" },
     { room: "603", door: "open→closed (normal)", projector: "on→off (normal)", status: "Inactive" },

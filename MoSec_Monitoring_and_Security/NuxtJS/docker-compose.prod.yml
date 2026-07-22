@@ -12,7 +12,12 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-  
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mosec"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   nuxt:
     build:
       context: .
@@ -29,7 +34,8 @@ services:
       # PythonServer runs on the host, reach it via the Docker host gateway.
       - NUXT_PYTHON_SERVER_URL=http://host.docker.internal:8000
     depends_on:
-      - db                           # <-- Diperbaiki: db-prod diganti jadi db
+      db:
+        condition: service_healthy   # <-- Diperbaiki: db-prod diganti jadi db
     # Baris command npm DIHAPUS agar CMD dari Dockerfile.prod bisa bekerja
 
 # <-- Diperbaiki: Wajib mendaftarkan nama volume di sini

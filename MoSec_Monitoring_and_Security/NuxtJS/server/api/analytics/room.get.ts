@@ -11,13 +11,12 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Parameter roomId wajib dikirim!' });
   }
 
-  // 1. Ambil Data Dasar Ruangan
   const room = await db.select().from(rooms).where(eq(rooms.id, targetRoomId)).limit(1);
   if (room.length === 0) {
     throw createError({ statusCode: 404, message: `Ruangan ${targetRoomId} tidak ditemukan` });
   }
 
-  // Current door & projector state from history
+  // Latest door & projector state (from DB, fed by the IoT sender via POST).
   const doorResult = await db.execute(sql`
     SELECT status FROM door_lock_history
     WHERE room_id = ${targetRoomId}
@@ -36,7 +35,7 @@ export default defineEventHandler(async (event) => {
   const isOpen = doorResult.length > 0 ? doorResult[0]!.status === 'open' : false;
   const projectorOn = projectorResult.length > 0 ? projectorResult[0]!.is_on : false;
 
-  // 2. Status ruangan dari Messier borrowings + sensor
+  // Status ruangan dari Messier borrowings + sensor
   let roomStatus: 'Active' | 'Warning' | 'Inactive' = 'Inactive';
   let borrowing: unknown;
 
@@ -46,76 +45,63 @@ export default defineEventHandler(async (event) => {
       const parsed = JSON.parse(authUser);
       if (parsed.token) {
         const borrowings = await getActiveBorrowings(parsed.token);
-
         const roomName = room[0]!.name;
-        borrowing = borrowings.filter(tx =>
-          tx.roomNumber == roomName
-        )[0];
-
-        if (borrowing) {
-          roomStatus = 'Active';
-        }
+        borrowing = borrowings.filter(tx => tx.roomNumber == roomName)[0];
+        if (borrowing) roomStatus = 'Active';
       }
     } catch {
       // Messier unreachable — fall through to sensor-based status
     }
   }
 
-  // If no borrowing
   if (roomStatus !== 'Active') {
-    if (isOpen || projectorOn) {
-      roomStatus = 'Warning';
-    } else {
-      roomStatus = 'Inactive';
-    }
+    roomStatus = (isOpen || projectorOn) ? 'Warning' : 'Inactive';
   }
 
-  // 3. Insiden Pintu Lupa Dikunci (Spesifik Ruangan Ini)
-  const unlockIncidentsResult = await db.execute(sql`
-    WITH paired_locks AS (
-        SELECT 
-            status,
-            recorded_at AS opened_at,
-            LEAD(recorded_at) OVER (ORDER BY recorded_at) AS closed_at
-        FROM door_lock_history
-        WHERE room_id = ${targetRoomId}
-    )
+  // Insiden bulan ini (dari histori DB)
+  // "Room left unlocked" = number of times the door was recorded as opened this month.
+  const unlockRes = await db.execute(sql`
     SELECT COUNT(*)::int AS count
-    FROM paired_locks
-    WHERE status = 'open'
-      AND opened_at >= date_trunc('month', CURRENT_DATE)
-      AND (
-        (closed_at IS NOT NULL AND EXTRACT(EPOCH FROM (closed_at - opened_at)) / 3600 > 4)
-        OR 
-        (closed_at IS NULL AND EXTRACT(EPOCH FROM (NOW() - opened_at)) / 3600 > 4)
-      )
-  `);
-  const unlockIncidentsCount = Number(unlockIncidentsResult[0]?.count || 0);
+    FROM door_lock_history
+    WHERE room_id = ${targetRoomId}
+      AND status = 'open'
+      AND recorded_at >= date_trunc('month', CURRENT_DATE)
+  `) as { count: number }[];
+  const unlockIncidentsCount = Number(unlockRes[0]?.count || 0);
 
-  // 4. Uptime Proyektor Spesifik Ruangan (Minggu Ini)
+  // "Projector left on" = number of projector sessions started this month.
+  const projRes = await db.execute(sql`
+    SELECT COUNT(*)::int AS count
+    FROM projector_history
+    WHERE room_id = ${targetRoomId}
+      AND turned_on_at >= date_trunc('month', CURRENT_DATE)
+  `) as { count: number }[];
+  const projectorIncidentsCount = Number(projRes[0]?.count || 0);
+
+  // Uptime proyektor minggu ini
   const uptimeResult = await db.select({
     total_seconds: sql<number>`SUM(EXTRACT(EPOCH FROM (COALESCE(turned_off_at, NOW()) - turned_on_at)))`
   })
-  .from(projector_history)
-  .where(and(
+    .from(projector_history)
+    .where(and(
       eq(projector_history.room_id, targetRoomId),
       sql`turned_on_at >= NOW() - INTERVAL '7 days'`
-  ));
+    ));
   const totalUptimeHours = Number((uptimeResult[0]?.total_seconds || 0) / 3600);
 
-  // 5. Data Grafik Harian (Chart Data) Spesifik Ruangan
+  // Grafik harian (7 hari)
   const dailyUptimeResult = await db.select({
     day_name: sql<string>`to_char(turned_on_at, 'Dy')`,
     day_idx: sql<number>`EXTRACT(ISODOW FROM turned_on_at)`,
     daily_seconds: sql<number>`SUM(EXTRACT(EPOCH FROM (COALESCE(turned_off_at, NOW()) - turned_on_at)))`
   })
-  .from(projector_history)
-  .where(and(
+    .from(projector_history)
+    .where(and(
       eq(projector_history.room_id, targetRoomId),
       sql`turned_on_at >= NOW() - INTERVAL '7 days'`
-  ))
-  .groupBy(sql`1, 2`)
-  .orderBy(sql`2`);
+    ))
+    .groupBy(sql`1, 2`)
+    .orderBy(sql`2`);
 
   let maxSeconds = 0;
   dailyUptimeResult.forEach(row => { if (row.daily_seconds > maxSeconds) maxSeconds = row.daily_seconds; });
@@ -135,6 +121,7 @@ export default defineEventHandler(async (event) => {
       doorLocked: !isOpen,
       totalUptime: totalUptimeHours.toFixed(1),
       unlockIncidents: unlockIncidentsCount,
+      projectorIncidents: projectorIncidentsCount,
       chartData: chartData.length > 0 ? chartData : [{ day: '-', percent: 0 }],
       borrowing,
     }

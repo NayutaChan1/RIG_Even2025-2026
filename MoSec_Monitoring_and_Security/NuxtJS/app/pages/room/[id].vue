@@ -36,18 +36,17 @@
     <div class="card card-dark">
       <div class="card-header"><span class="tag">Room Left Unlocked</span></div>
       <div class="card-body">
-        <h1 class="big-number text-pink">{{ roomData.unlockIncidents }} Times (CHANGE DATA)</h1>
+        <h1 class="big-number text-pink">{{ roomData.unlockIncidents }} Times</h1>
         <p class="subtitle">Incidents this month</p>
       </div>
       <div class="wave-bg"></div>
     </div>
 
     <!-- PROJECTOR ON INCIDENT  -->
-    <!-- TODO change data -->
     <div class="card card-dark">
       <div class="card-header"><span class="tag">Projector Left On</span></div>
       <div class="card-body">
-        <h1 class="big-number text-pink">{{ roomData.unlockIncidents }} Times</h1>
+        <h1 class="big-number text-pink">{{ roomData.projectorIncidents }} Times</h1>
         <p class="subtitle">Incidents this month</p>
       </div>
       <div class="wave-bg"></div>

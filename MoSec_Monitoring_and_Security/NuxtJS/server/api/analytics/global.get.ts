@@ -1,17 +1,23 @@
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '../../utils/db';
-import { rooms, door_lock_history, projector_history } from '../../utils/schema';
-import { getActiveBorrowings } from '~~/server/utils/borrow-status';
+import { rooms, projector_history } from '../../utils/schema';
+import { getActiveBorrowings } from '../../utils/borrow-status';
+
+// Power draw assumption used to turn uptime hours into kWh.
+const KWH_PER_HOUR = 0.3;
 
 export default defineEventHandler(async (event) => {
 
-// LATEST DOOR & PROJECTOR STATUS ====================================================================
+  const allRooms = await db.select().from(rooms);
+
+// LATEST DOOR & PROJECTOR STATE (from DB, fed by the IoT via POST /api/door,/projector) ===========
 
   const doorResult = await db.execute(sql`
     SELECT DISTINCT ON (room_id) room_id, status
     FROM door_lock_history
     ORDER BY room_id, recorded_at DESC
   `) as { room_id: string; status: string }[];
+  const doorMap = new Map(doorResult.map(d => [d.room_id, d.status]));
 
   const projectorResult = await db.execute(sql`
     SELECT DISTINCT ON (room_id) room_id,
@@ -19,104 +25,42 @@ export default defineEventHandler(async (event) => {
     FROM projector_history
     ORDER BY room_id, turned_on_at DESC
   `) as { room_id: string; is_on: boolean }[];
-
-  const doorMap = new Map(doorResult.map(d => [d.room_id, d.status]));
   const projectorMap = new Map(projectorResult.map(p => [p.room_id, p.is_on]));
 
-// // ACTIVE LABS =======================================================================================
-
-  const allRooms = await db.select().from(rooms);
-//   const activeLabsCount = allRooms.filter(r =>
-//     doorMap.get(r.id) === 'open' && projectorMap.get(r.id)
-//   ).length;
-
-// UNLOCKED ROOMS INCIDENTS ==============================================================================
-
-  const history = await db
-  .select()
-  .from(door_lock_history)
-  .where(sql`${door_lock_history.recorded_at} >= date_trunc('month', CURRENT_DATE)`)
-  .orderBy(door_lock_history.room_id, door_lock_history.recorded_at);
-
-  const TWO_HOURS = 2 * 60 * 60 * 1000;
-  let unlockIncidentsResult = 0;
-  const grouped = new Map<string, typeof history>();
-
-  for (const h of history) {
-    if (!grouped.has(h.room_id))
-      grouped.set(h.room_id, []);
-    grouped.get(h.room_id)!.push(h);
-  }
-
-  for (const logs of grouped.values()) {
-    for (let i = 0; i < logs.length; i++) {
-      if (logs[i]!.status !== 'open')
-        continue;
-      const opened = logs[i]!.recorded_at!;
-      const closed =
-        logs
-          .slice(i + 1)
-          .find(x => x.status === 'closed')
-          ?.recorded_at ?? new Date();
-
-      if (closed.getTime() - opened.getTime() > TWO_HOURS)
-        unlockIncidentsResult++;
-    }
-  }
-
-  let unlockIncidentsCount = unlockIncidentsResult;
-
-// PROJECTOR UPTIME =================================================================================
+// PROJECTOR UPTIME + DAILY CHART (last 7 days) ====================================================
 
   const histories = await db
-  .select()
-  .from(projector_history)
-  .where(sql`${projector_history.turned_on_at} >= NOW() - INTERVAL '7 days'`);
+    .select()
+    .from(projector_history)
+    .where(sql`${projector_history.turned_on_at} >= NOW() - INTERVAL '7 days'`);
 
   let totalSeconds = 0;
-  for (const row of histories) {
-      if (!row.turned_on_at)
-          continue;
-
-      const end = row.turned_off_at ?? new Date();
-      totalSeconds +=
-          (end.getTime() - row.turned_on_at.getTime()) / 1000;
-  }
-
-  const totalUptimeHours = totalSeconds / 3600;
-  const totalPowerConsumption = Number((totalUptimeHours * 0.3).toFixed(1));
-
-// DAILY CHART ===============================================================================
-
   const daily = new Map<number, number>();
 
   for (const row of histories) {
-      if (!row.turned_on_at)
-          continue;
-
-      const end = row.turned_off_at ?? new Date();
-      const seconds = (end.getTime() - row.turned_on_at.getTime()) / 1000;
-      const day = row.turned_on_at.getDay();
-      daily.set(day, (daily.get(day) ?? 0) + seconds);
+    if (!row.turned_on_at) continue;
+    const end = row.turned_off_at ?? new Date();
+    const seconds = (end.getTime() - row.turned_on_at.getTime()) / 1000;
+    totalSeconds += seconds;
+    const day = row.turned_on_at.getDay();
+    daily.set(day, (daily.get(day) ?? 0) + seconds);
   }
 
+  const totalUptimeHours = totalSeconds / 3600;
+  const totalPowerConsumption = Number((totalUptimeHours * KWH_PER_HOUR).toFixed(1));
+
   const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
   const max = Math.max(...daily.values(), 0);
-
   const chartData = [...daily.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([day, seconds]) => ({
-          day: names[day],
-          percent: max === 0
-              ? 0
-              : Math.round(seconds / max * 100)
-      }));
+    .sort((a, b) => a[0] - b[0])
+    .map(([day, seconds]) => ({
+      day: names[day],
+      percent: max === 0 ? 0 : Math.round((seconds / max) * 100),
+    }));
 
-// ==========================================================================================
+// ACTIVE BORROWINGS (from Messier) ================================================================
 
   const authUser = getCookie(event, 'auth_user');
-
   if (!authUser) {
     throw createError({ statusCode: 401, message: 'Not authenticated' });
   }
@@ -132,49 +76,43 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: 'No Messier token found' });
   }
 
-  // from active room borrowing (not transaction)
   const activeBorrowings = await getActiveBorrowings(parsed.token);
-  const activeRoomSet = new Set(
-    activeBorrowings.map(b => String(b.roomNumber))
-  );
+  const activeRoomSet = new Set(activeBorrowings.map(b => String(b.roomNumber)));
+
+// ROOM STATUS + UNLOCK INCIDENTS =================================================================
 
   const roomData = allRooms.map(room => {
-    const hasTransaction = activeRoomSet.has(room.name);
+    const isBorrowed = activeRoomSet.has(room.name);
     const isUnlocked = doorMap.get(room.id) === 'open';
     const projectorOn = projectorMap.get(room.id) ?? false;
 
     let status: "Active" | "Warning" | "Inactive";
-
-    if (hasTransaction) {
+    if (isBorrowed) {
       status = 'Active';
     } else {
-      if (isUnlocked || projectorOn) {
-        status = "Warning";
-      } else {
-        status = "Inactive";
-      }
+      status = (isUnlocked || projectorOn) ? "Warning" : "Inactive";
     }
 
-    return {
-      id: room.id,
-      name: room.name,
-      status,
-    };
+    return { id: room.id, name: room.name, status, isBorrowed, isUnlocked };
   });
 
-  console.log(roomData.filter(rm => rm.status === 'Active'));
-  console.log(roomData.filter(rm => rm.status === 'Warning'));
+  // Unlock incident = room is NOT borrowed but the latest lock reading is unlocked.
+  const unlockIncidentsCount = roomData.filter(
+    rm => !rm.isBorrowed && rm.isUnlocked
+  ).length;
+
+// ==========================================================================================
 
   return {
     success: true,
     data: {
-      activeLabs: roomData.filter(rm => rm.status === 'Active').length, 
-      warnings: roomData.filter(rm => rm.status === 'Warning').length, 
+      activeLabs: roomData.filter(rm => rm.status === 'Active').length,
+      warnings: roomData.filter(rm => rm.status === 'Warning').length,
       unlockIncidents: unlockIncidentsCount,
       totalUptime: totalUptimeHours.toFixed(1),
       totalPowerConsumption: totalPowerConsumption,
       chartData: chartData.length > 0 ? chartData : [{ day: '-', percent: 0 }],
-      rooms: roomData
+      rooms: roomData.map(({ id, name, status }) => ({ id, name, status })),
     }
   };
 });

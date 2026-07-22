@@ -22,18 +22,18 @@
       </div>
     </NuxtLink>
 
-    <div class="card card-dark">
+    <NuxtLink to="/dashboard/incidents" class="card card-dark card-link">
       <div class="card-header"><span class="tag">
           <DoorOpen :size="14" /> Unlocked Incidents
         </span></div>
       <div class="card-body">
         <h1 class="big-number text-pink">{{ summaryData.unlockIncidents }}</h1>
-        <p class="subtitle">Total this month</p>
+        <p class="subtitle">Unlocked now, not borrowed</p>
       </div>
       <div class="wave-bg"></div>
-    </div>
+    </NuxtLink>
 
-    <div class="card card-dark span-2">
+    <NuxtLink to="/dashboard/projector" class="card card-dark span-2 card-link">
       <div class="card-header"><span class="tag">
           <Clock :size="14" /> Total Projector Uptime (Building)
         </span></div>
@@ -51,7 +51,7 @@
         </div>
 
       </div>
-    </div>
+    </NuxtLink>
 
     <div class="card card-gradient">
       <div class="card-header"><span class="tag">

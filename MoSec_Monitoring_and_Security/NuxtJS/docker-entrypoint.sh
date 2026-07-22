@@ -8,6 +8,7 @@ if [ "$1" = "dev" ]; then
   if [ ! -f "$SEED_FLAG" ]; then
     echo "Running seed..."
     npx tsx drizzle/seed.ts
+    npx tsx drizzle/seed-history.ts
     touch "$SEED_FLAG"
     echo "Seed complete"
   fi
@@ -18,6 +19,7 @@ elif [ "$1" = "prod" ]; then
   if [ ! -f "$SEED_FLAG" ]; then
     echo "Running seed..."
     npx tsx drizzle/seed.ts
+    npx tsx drizzle/seed-history.ts
     touch "$SEED_FLAG"
     echo "Seed complete"
   fi

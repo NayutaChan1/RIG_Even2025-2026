@@ -12,7 +12,7 @@
             >
               <option value="">— Select a lab —</option>
               <option v-for="room in roomList" :key="room.id" :value="room.id">
-                {{ room.name }} ({{ room.id }})
+                Lab {{ room.name }}
               </option>
             </select>
           </div>
