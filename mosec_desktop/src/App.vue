@@ -6,7 +6,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { save } from "@tauri-apps/plugin-dialog";
 
 // ── Backend URL (NuxtJS server) ──────────────────────────────────────
-const BACKEND_URL = "http://localhost:3000";
+const BACKEND_URL = "http://10.20.187.115:3000";
 
 // ── Types ────────────────────────────────────────────────────────────
 type SerialStatusEvent = {
